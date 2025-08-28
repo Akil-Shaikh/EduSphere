@@ -49,6 +49,7 @@ def dashboard_view(request):
     
     else: # For HOD, Admin, etc.
         context['message'] = "Welcome to the Edusphere dashboard."
+        context['role']=user.role
         return render(request, 'dashboard/generic_dashboard.html', context)
     
 @login_required
