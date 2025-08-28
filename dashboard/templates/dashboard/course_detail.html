@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ course.title }}</li>
+        </ol>
+    </nav>
+
+    <h1 class="mb-2">{{ course.title }}</h1>
+    <h5 class="text-muted mb-4">{{ course.code }}</h5>
+
+    {% for module in modules %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>{{ module.title }}</h4>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for content in module.contents.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            {% if content.content_type == 'FILE' %}
+                                📄 {% elif content.content_type == 'TEXT' %}
+                                ✍️ {% elif content.content_type == 'VIDEO_URL' %}
+                                📹 {% endif %}
+                            <span class="ms-2">{{ content.title }}</span>
+                        </div>
+                        <div>
+                            {% if content.content_type == 'TEXT' %}
+                                <a href="{% url 'content_detail' pk=content.pk %}" class="btn btn-sm btn-primary">View</a>
+                            {% elif content.content_type == 'FILE' and content.file_content %}
+                                <a href="{{ content.file_content.url }}" class="btn btn-sm btn-outline-primary" target="_blank">Download</a>
+                            {% elif content.content_type == 'VIDEO_URL' and content.video_url %}
+                                <a href="{{ content.video_url }}" class="btn btn-sm btn-outline-primary" target="_blank">Watch Video</a>
+                            {% endif %}
+                        </div>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item">No content has been added to this module yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% empty %}
+        <div class="alert alert-info">No modules have been added to this course yet.</div>
+    {% endfor %}
+{% endblock %}

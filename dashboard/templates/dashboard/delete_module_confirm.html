@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1 class="mb-4">Confirm Deletion</h1>
+
+    <div class="alert alert-danger">
+        <h4>Warning!</h4>
+        <p>Are you sure you want to delete the module titled: <strong>"{{ module.title }}"</strong>?</p>
+        <p><strong>This will also delete all content (lessons, files, etc.) within this module.</strong> This action cannot be undone.</p>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Yes, Delete Module</button>
+        <a href="{% url 'manage_course' pk=module.course.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

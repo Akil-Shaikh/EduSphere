@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1 class="mb-4">Student Dashboard</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Your Program Details</h3>
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">{{ program.title }} ({{ program.code }})</h5>
+            <p class="card-text">
+                <strong>Department:</strong> {{ program.department.name }} <br>
+                <strong>Roll Number:</strong> {{ enrollment.roll_number }}
+            </p>
+        </div>
+    </div>
+
+    <h3>Your Courses</h3>
+    
+    {% for semester, courses in courses_by_semester.items %}
+        <div class="accordion mb-3" id="accordionSemester{{ semester }}">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ semester }}">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ semester }}" aria-expanded="true" aria-controls="collapse{{ semester }}">
+                        <strong>Semester {{ semester }}</strong>
+                    </button>
+                </h2>
+                <div id="collapse{{ semester }}" class="accordion-collapse collapse show" aria-labelledby="heading{{ semester }}" data-bs-parent="#accordionSemester{{ semester }}">
+                    <div class="accordion-body">
+                        <ul class="list-group">
+                            {% for course in courses %}
+                                <li class="list-group-item">
+                                    <a href="{% url 'course_detail' pk=course.pk %}">
+                                        {{ course.title }} ({{ course.code }})
+                                    </a>
+                                    <small class="text-muted">- Taught by: {{ course.faculty.get_full_name|default:"N/A" }}</small>
+                                </li>
+                            {% empty %}
+                                <li class="list-group-item">No courses found for this semester.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <p>No courses have been assigned to your program yet.</p>
+    {% endfor %}
+
+{% endblock %}
