@@ -1,0 +1,23 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{% if form.instance.pk %}Update Quiz{% else %}Create Quiz{% endif %}{% endblock %}
+
+{% block content %}
+    <h2>
+        {% if form.instance.pk %}
+            Update Quiz: {{ form.instance.title }}
+        {% else %}
+            Create New Quiz for {{ subject.title }}
+        {% endif %}
+    </h2>
+    <hr>
+    <form method="post">
+        {% csrf_token %}
+        <p><strong>Note:</strong> For the due date, please use YYYY-MM-DD HH:MM:SS format.</p>
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">
+            {% if form.instance.pk %}Save Changes{% else %}Create Quiz{% endif %}
+        </button>
+        <a href="{% url 'core:faculty_subject_detail' subject.pk|default:form.instance.subject.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

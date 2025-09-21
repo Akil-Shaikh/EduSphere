@@ -1,0 +1,82 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Manage {{ subject.title }}{% endblock %}
+
+{% block content %}
+    <h2>Manage Subject: {{ subject.title }}</h2>
+    <p class="text-muted">Part of {{ subject.course.title }}</p>
+    <hr>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Learning Resources</h4>
+        <a href="{% url 'core:resource_create' subject.pk %}" class="btn btn-primary">Upload New Resource</a>
+    </div>
+
+    <ul class="list-group">
+        {% for resource in subject.resources.all %}
+            <li class="list-group-item">
+                <h5>{{ resource.title }}</h5>
+                <p>{{ resource.description|default:"No description." }}</p>
+                {% if resource.file %}
+                    <a href="{{ resource.file.url }}" class="btn btn-sm btn-outline-success" target="_blank">Download File</a>
+                {% endif %}
+                {% if resource.link %}
+                    <a href="{{ resource.link }}" class="btn btn-sm btn-outline-info" target="_blank">Open Link</a>
+                {% endif %}
+            </li>
+        {% empty %}
+            <li class="list-group-item">No learning resources have been uploaded for this subject yet.</li>
+        {% endfor %}
+    </ul>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Assignments</h4>
+        <a href="{% url 'core:assignment_create' subject.pk %}" class="btn btn-primary">Create New Assignment</a>
+    </div>
+    <div class="list-group">
+        {% for assignment in subject.assignments.all %}
+        <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{ assignment.title }}</h5>
+                <div>
+                    <a href="{% url 'core:view_submissions' assignment.pk %}" class="btn btn-sm btn-info">
+                        Submissions <span class="badge bg-light text-dark">{{ assignment.submissions.count }}</span>
+                    </a>
+                    <a href="{% url 'core:assignment_update' assignment.pk %}" class="btn btn-sm btn-secondary">Edit</a>
+                    <a href="{% url 'core:assignment_delete' assignment.pk %}" class="btn btn-sm btn-danger">Delete</a>
+                </div>
+            </div>
+            <p class="mb-1">{{ assignment.description|truncatewords:20 }}</p>
+            <small>Due: {{ assignment.due_date }} | Total Marks: {{ assignment.total_marks }}</small>
+        </div>
+        {% empty %}
+        <div class="list-group-item">No assignments have been created for this subject yet.</div>
+        {% endfor %}
+    </div>
+    <div class="list-group">
+        </div>
+
+    <hr class="mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Quizzes</h4>
+        <a href="{% url 'core:quiz_create' subject.pk %}" class="btn btn-primary">Create New Quiz</a>
+    </div>
+    <div class="list-group">
+        {% for quiz in subject.quizzes.all %}
+        <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{ quiz.title }}</h5>
+                <div>
+                    <a href="{% url 'core:quiz_detail' quiz.pk %}" class="btn btn-sm btn-info">Manage Questions</a>
+                    <a href="{% url 'core:quiz_update' quiz.pk %}" class="btn btn-sm btn-secondary">Edit</a>
+                    <a href="{% url 'core:quiz_delete' quiz.pk %}" class="btn btn-sm btn-danger">Delete</a>
+                </div>
+            </div>
+            <small>Due: {{ quiz.due_date }}</small>
+        </div>
+        {% empty %}
+        <div class="list-group-item">No quizzes have been created for this subject yet.</div>
+        {% endfor %}
+    </div>
+
+    <a href="{% url 'core:faculty_subject_list' %}" class="btn btn-secondary mt-4">Back to My Subjects</a>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Grade Attempt{% endblock %}
+
+{% block content %}
+    <h3>Grading Quiz for {{ attempt.student.user.get_full_name }}</h3>
+    <p class="text-muted">Quiz: {{ attempt.quiz.title }}</p>
+    <hr>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ formset.management_form }}
+
+        {% for qa in questions_and_answers %}
+            <div class="card mb-3">
+                <div class="card-header"><strong>Q: {{ qa.question.text|linebreaksbr }}</strong> ({{ qa.question.marks }} marks)</div>
+                <div class="card-body">
+                    {% if qa.answer %}
+                        {% if qa.question.question_type == 'MCQ' %}
+                            <p><strong>Student's Answer:</strong> {{ qa.answer.mcq_option.text }}</p>
+                            {% if qa.answer.mcq_option.is_correct %}
+                                <span class="badge bg-success">Correct</span>
+                            {% else %}
+                                <span class="badge bg-danger">Incorrect</span>
+                            {% endif %}
+                        {% else %} <p><strong>Student's Answer:</strong></p>
+                            <blockquote class="blockquote">{{ qa.answer.descriptive_answer|linebreaks }}</blockquote>
+                            {% for form in formset %}
+                                {% if form.instance == qa.answer %}
+                                    <div class="input-group input-group-sm w-25">
+                                        <span class="input-group-text">Marks:</span>
+                                        {{ form.marks_awarded }}
+                                        {{ form.id }}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    {% else %}
+                        <p class="text-danger">Student did not answer this question.</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-success">Save All Grades</button>
+        <a href="{% url 'core:quiz_attempts_list' attempt.quiz.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

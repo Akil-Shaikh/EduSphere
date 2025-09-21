@@ -1,0 +1,18 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Enroll Student{% endblock %}
+
+{% block content %}
+    <h2>Enroll Student in {{ course.title }}</h2>
+    <hr>
+
+    <form method="post">
+        {% csrf_token %}
+        <p>Select a student from the list and assign a roll number. Students already enrolled in this course are not shown.</p>
+        
+        {{ form.as_p }}
+        
+        <button type="submit" class="btn btn-success">Enroll Student</button>
+        <a href="{% url 'core:course_detail' course.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

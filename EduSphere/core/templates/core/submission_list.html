@@ -1,0 +1,46 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Submissions for {{ assignment.title }}{% endblock %}
+
+{% block content %}
+    <h2>Submissions for "{{ assignment.title }}"</h2>
+    <p class="text-muted">Subject: {{ assignment.subject.title }}</p>
+    <hr>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Submitted At</th>
+                    <th>File</th>
+                    <th>Grade & Feedback</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for submission, form in submission_forms %}
+                <tr>
+                    <td>{{ submission.student.user.get_full_name|default:submission.student.user.username }}</td>
+                    <td>{{ submission.submitted_at|date:"F j, Y, P" }}</td>
+                    <td>
+                        <a href="{{ submission.submitted_file.url }}" class="btn btn-sm btn-outline-primary" target="_blank">Download</a>
+                    </td>
+                    <td>
+                        <form action="{% url 'core:grade_submission' submission.pk %}" method="post">
+                            {% csrf_token %}
+                            {{ form.grade }}
+                            {{ form.feedback }}
+                            <button type="submit" class="btn btn-sm btn-success mt-1">Save Grade</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center">No submissions yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <a href="{% url 'core:faculty_subject_detail' assignment.subject.pk %}" class="btn btn-secondary mt-3">Back to Subject</a>
+{% endblock %}

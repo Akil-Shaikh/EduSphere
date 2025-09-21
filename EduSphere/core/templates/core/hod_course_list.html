@@ -1,0 +1,26 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Manage Courses{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Courses in Your Department</h2>
+        <a href="{% url 'core:course_create' %}" class="btn btn-primary">Create New Course</a>
+    </div>
+
+    <p>Here is a list of all courses under your management.</p>
+
+    <div class="list-group">
+        {% for course in courses %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ course.title }} ({{ course.code }})</span>
+                <div>
+                    <a href="{% url 'core:course_update' course.pk %}" class="btn btn-sm btn-secondary">Edit</a>
+                    <a href="{% url 'core:course_detail' course.pk %}" class="btn btn-sm btn-info">View Subjects</a>
+                </div>
+            </div>
+        {% empty %}
+            <div class="list-group-item">No courses found in your department. You can create one using the button above.</div>
+        {% endfor %}
+    </div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends 'core/base.html' %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Update Course
+    {% else %}
+        Create Course
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <h2>
+        {% if form.instance.pk %}
+            Update Course: {{ form.instance.title }}
+        {% else %}
+            Create a New Course
+        {% endif %}
+    </h2>
+    <hr>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        {{ form.as_p }}
+        
+        <button type="submit" class="btn btn-success">
+            {% if form.instance.pk %}
+                Save Changes
+            {% else %}
+                Create Course
+            {% endif %}
+        </button>
+        <a href="{% url 'core:hod_course_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

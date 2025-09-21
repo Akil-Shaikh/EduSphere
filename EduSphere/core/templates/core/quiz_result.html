@@ -1,0 +1,21 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Quiz Result{% endblock %}
+
+{% block content %}
+    <div class="card text-center">
+        <div class="card-header">
+            <h3>Result for: {{ attempt.quiz.title }}</h3>
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">Quiz Submitted Successfully!</h5>
+            <p class="card-text">Your score for the auto-graded questions is:</p>
+            <h1 class="display-4">{{ attempt.score }} / {{ total_marks }}</h1>
+            <p class="text-muted">(Descriptive questions will be graded by your faculty.)</p>
+            <a href="{% url 'core:student_course_detail' attempt.quiz.subject.course.pk %}" class="btn btn-primary">Back to Course</a>
+        </div>
+        <div class="card-footer text-muted">
+            Attempted on: {{ attempt.completed_at }}
+        </div>
+    </div>
+{% endblock %}

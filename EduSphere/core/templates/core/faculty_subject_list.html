@@ -1,0 +1,27 @@
+{% extends 'core/base.html' %}
+
+{% block title %}My Subjects{% endblock %}
+
+{% block content %}
+    <h2>My Assigned Subjects</h2>
+    <p>Here are all the subjects you are assigned to teach for the current session.</p>
+
+    <div class="list-group">
+        {% for subject in subjects_taught %}
+            <div class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">{{ subject.title }}</h5>
+                    <small>Subject Code: {{ subject.code }}</small>
+                </div>
+                <p class="mb-1">
+                    Part of Course: <strong>{{ subject.course.title }}</strong>
+                </p>
+                <div class="mt-2">
+                    <a href="{% url 'core:faculty_subject_detail' subject.pk %}" class="btn btn-primary btn-sm">Manage Content</a>
+                </div>
+            </div>
+        {% empty %}
+            <div class="list-group-item">You are not currently assigned to teach any subjects.</div>
+        {% endfor %}
+    </div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Add Subject{% endblock %}
+
+{% block content %}
+    <h2>Add a New Subject</h2>
+    <hr>
+
+    <form method="post">
+        {% csrf_token %}
+        <p>Note: The faculty list is filtered to your department.</p>
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Save Subject</button>
+        <a href="{{ view.get_success_url }}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

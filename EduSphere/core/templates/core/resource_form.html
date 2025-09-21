@@ -1,0 +1,16 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Upload Resource{% endblock %}
+
+{% block content %}
+    <h2>Upload Resource for {{ subject.title }}</h2>
+    <p class="text-muted">You can upload a file (like a PDF or ZIP) or provide a URL to an external resource (like a YouTube video).</p>
+    <hr>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Upload Resource</button>
+        <a href="{% url 'core:faculty_subject_detail' subject.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

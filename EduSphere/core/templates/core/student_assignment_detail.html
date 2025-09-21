@@ -1,0 +1,52 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ assignment.title }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="card-header">
+            <h2>{{ assignment.title }}</h2>
+        </div>
+        <div class="card-body">
+            <p><strong>Subject:</strong> {{ assignment.subject.title }}</p>
+            <p><strong>Due Date:</strong> {{ assignment.due_date }}</p>
+            <p><strong>Total Marks:</strong> {{ assignment.total_marks }}</p>
+            <hr>
+            <h5 class="card-title">Description</h5>
+            <p class="card-text">{{ assignment.description|linebreaks }}</p>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h4>My Submission</h4>
+        </div>
+        <div class="card-body">
+            {% if existing_submission %}
+                <div class="alert alert-success">
+                    <h5 class="alert-heading">Submission Complete!</h5>
+                    <p>You submitted this assignment on: <strong>{{ existing_submission.submitted_at }}</strong>.</p>
+                    <hr>
+                    <p><strong>Grade:</strong> 
+                        {% if existing_submission.grade is not None %}
+                            {{ existing_submission.grade }} / {{ assignment.total_marks }}
+                        {% else %}
+                            Not graded yet.
+                        {% endif %}
+                    </p>
+                    {% if existing_submission.feedback %}
+                        <p><strong>Feedback:</strong> {{ existing_submission.feedback }}</p>
+                    {% endif %}
+                </div>
+            {% else %}
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit" class="btn btn-primary">Submit Assignment</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <a href="{% url 'core:student_course_detail' assignment.subject.course.pk %}" class="btn btn-secondary mt-3">Back to Course</a>
+{% endblock %}

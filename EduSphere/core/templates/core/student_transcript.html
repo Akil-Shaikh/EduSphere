@@ -1,0 +1,51 @@
+{% extends 'core/base.html' %}
+
+{% block title %}My Transcript{% endblock %}
+
+{% block content %}
+    <h2>My Grades & Transcript</h2>
+    <p>This page shows a summary of your graded work across all enrolled courses.</p>
+    <hr>
+
+    {% for course_data in transcript_data %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4>Course: {{ course_data.course.title }}</h4>
+            </div>
+            <div class="card-body">
+                {% for subject_data in course_data.subjects %}
+                    <h5 class="mt-2">{{ subject_data.subject.title }}</h5>
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Assessment</th>
+                                <th>Type</th>
+                                <th class="text-end">Grade / Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for submission in subject_data.assignments %}
+                                <tr>
+                                    <td>{{ submission.assignment.title }}</td>
+                                    <td>Assignment</td>
+                                    <td class="text-end">{{ submission.grade }} / {{ submission.assignment.total_marks }}</td>
+                                </tr>
+                            {% endfor %}
+                            {% for attempt in subject_data.quizzes %}
+                                <tr>
+                                    <td>{{ attempt.quiz.title }}</td>
+                                    <td>Quiz</td>
+                                    <td class="text-end">{{ attempt.score }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endfor %}
+            </div>
+        </div>
+    {% empty %}
+        <div class="alert alert-info">
+            You do not have any graded assignments or completed quizzes to display yet.
+        </div>
+    {% endfor %}
+{% endblock %}

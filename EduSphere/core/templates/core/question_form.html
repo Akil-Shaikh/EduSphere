@@ -1,0 +1,50 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Add Question{% endblock %}
+
+{% block content %}
+    <h2>Add Question to "{{ quiz.title }}"</h2>
+    <hr>
+    <form method="post">
+        {% csrf_token %}
+
+        {{ form.as_p }}
+
+        <div id="mcq-options-container" style="display: none;">
+            <h4>MCQ Options</h4>
+            <p>Enter the options below and check the box for the correct answer.</p>
+            {{ option_formset.management_form }}
+            {% for option_form in option_formset %}
+                <div class="row mb-2 align-items-center">
+                    <div class="col-1">{{ forloop.counter }}</div>
+                    <div class="col-9">{{ option_form.text }}</div>
+                    <div class="col-2 text-center">{{ option_form.is_correct }} Correct</div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="submit" class="btn btn-success mt-3">Save Question</button>
+        <a href="{% url 'core:quiz_detail' quiz.pk %}" class="btn btn-secondary mt-3">Cancel</a>
+    </form>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const questionTypeSelect = document.getElementById('id_question_type');
+            const mcqOptionsContainer = document.getElementById('mcq-options-container');
+
+            function toggleOptions() {
+                if (questionTypeSelect.value === 'MCQ') {
+                    mcqOptionsContainer.style.display = 'block';
+                } else {
+                    mcqOptionsContainer.style.display = 'none';
+                }
+            }
+
+            // Check on page load
+            toggleOptions();
+
+            // Check on change
+            questionTypeSelect.addEventListener('change', toggleOptions);
+        });
+    </script>
+{% endblock %}
