@@ -1,0 +1,12 @@
+{% extends 'core/base.html' %}
+{% block title %}Register Faculty{% endblock %}
+{% block content %}
+    <h2>Register a New Faculty Member</h2>
+    <hr>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Register Faculty</button>
+        <a href="{% url 'core:faculty_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

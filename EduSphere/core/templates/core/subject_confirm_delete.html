@@ -1,0 +1,13 @@
+{% extends 'core/base.html' %}
+{% block title %}Confirm Delete{% endblock %}
+{% block content %}
+    <h2>Confirm Deletion</h2>
+    <hr>
+    <p>Are you sure you want to delete the subject: <strong>"{{ object.title }}"</strong>?</p>
+    <p class="text-danger">This will delete the subject and all of its learning resources, assignments, and quizzes. This action cannot be undone.</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Confirm Delete</button>
+        <a href="{% url 'core:course_detail' object.course.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

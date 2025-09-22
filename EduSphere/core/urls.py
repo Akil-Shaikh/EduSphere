@@ -13,14 +13,32 @@ urlpatterns = [
 
     # Application Views
     path('', views.DashboardView.as_view(), name='dashboard'),
+    path('notifications/', views.NotificationListView.as_view(), name='notification_list'), # New URL
+    
+     # --- NEW UNIVERSITY ADMIN URLs ---
+    path('u-admin/', views.UniversityAdminDashboardView.as_view(), name='uni_admin_dashboard'),
+    path('u-admin/departments/', views.DepartmentListView.as_view(), name='department_list'),
+    path('u-admin/departments/create/', views.DepartmentCreateView.as_view(), name='department_create'),
+    path('u-admin/departments/<int:pk>/update/', views.DepartmentUpdateView.as_view(), name='department_update'),
+    path('u-admin/students/', views.StudentListView.as_view(), name='student_list'),
+    path('u-admin/students/register/', views.StudentRegistrationView.as_view(), name='student_register'),
+    path('u-admin/faculty/', views.FacultyListView.as_view(), name='faculty_list'),
+    path('u-admin/faculty/register/', views.FacultyRegistrationView.as_view(), name='faculty_register'),
+    path('u-admin/students/register/', views.StudentRegistrationView.as_view(), name='student_register'),
+    path('u-admin/students/bulk-register/', views.StudentBulkRegistrationView.as_view(), name='student_bulk_register'), # New
     
     # Course Management for HOD
     path('courses/', views.HODCourseListView.as_view(), name='hod_course_list'),
     path('courses/create/', views.CourseCreateView.as_view(), name='course_create'),
     path('courses/<int:pk>/update/', views.CourseUpdateView.as_view(), name='course_update'),
+    path('courses/<int:pk>/delete/', views.CourseDeleteView.as_view(), name='course_delete'),
     path('courses/<int:pk>/', views.CourseDetailView.as_view(), name='course_detail'), # New
     path('courses/<int:course_pk>/subjects/create/', views.SubjectCreateView.as_view(), name='subject_create'), # New
+    path('subjects/<int:pk>/update/', views.SubjectUpdateView.as_view(), name='subject_update'),
+    path('subjects/<int:pk>/delete/', views.SubjectDeleteView.as_view(), name='subject_delete'),
     path('courses/<int:course_pk>/enroll/', views.EnrollStudentView.as_view(), name='enroll_student'), # New
+    path('unenroll/<int:pk>/', views.UnenrollStudentView.as_view(), name='unenroll_student'), 
+    path('courses/<int:course_pk>/bulk-enroll/', views.StudentBulkEnrollmentView.as_view(), name='student_bulk_enroll'), # New URL
     
     
     path('student/courses/', views.StudentCourseListView.as_view(), name='student_course_list'),
@@ -31,6 +49,8 @@ urlpatterns = [
     path('faculty/subjects/<int:pk>/', views.FacultySubjectDetailView.as_view(), name='faculty_subject_detail'),
     path('faculty/subjects/<int:subject_pk>/resources/create/', views.ResourceCreateView.as_view(), name='resource_create'),
     path('student/transcript/', views.StudentTranscriptView.as_view(), name='student_transcript'),
+    path('student/profile/', views.StudentProfileView.as_view(), name='student_profile'),
+
     # --- NEW STUDENT QUIZ URLs ---
     path('student/quizzes/<int:pk>/take/', views.TakeQuizView.as_view(), name='take_quiz'),
     path('student/quiz_attempt/<int:pk>/result/', views.QuizResultView.as_view(), name='quiz_result'),

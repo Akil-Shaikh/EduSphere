@@ -1,0 +1,12 @@
+{% extends 'core/base.html' %}
+{% block title %}Register Student{% endblock %}
+{% block content %}
+    <h2>Register a New Student</h2>
+    <hr>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Register Student</button>
+        <a href="{% url 'core:student_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

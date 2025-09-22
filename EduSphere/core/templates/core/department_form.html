@@ -1,0 +1,12 @@
+{% extends 'core/base.html' %}
+{% block title %}{% if form.instance.pk %}Update Department{% else %}Create Department{% endif %}{% endblock %}
+{% block content %}
+    <h2>{% if form.instance.pk %}Update Department{% else %}Create Department{% endif %}</h2>
+    <hr>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Save Changes</button>
+        <a href="{% url 'core:department_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

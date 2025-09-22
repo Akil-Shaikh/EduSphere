@@ -7,56 +7,76 @@
     <p class="text-muted">Course Code: {{ course.code }}</p>
     <hr>
 
-    {% for subject in course.subjects.all %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h4>Subject: {{ subject.title }}</h4>
-            </div>
-            <div class="card-body">
-                <h5 class="card-title">Learning Resources</h5>
-                <ul class="list-group list-group-flush mb-3">
-                    {% for resource in subject.resources.all %}
-                        <li class="list-group-item">
-                            {{ resource.title }}
-                            {% if resource.file %}
-                                <a href="{{ resource.file.url }}" class="btn btn-sm btn-outline-success float-end" target="_blank">Download File</a>
-                            {% endif %}
-                            {% if resource.link %}
-                                <a href="{{ resource.link }}" class="btn btn-sm btn-outline-info float-end" target="_blank">Open Link</a>
-                            {% endif %}
-                        </li>
-                    {% empty %}
-                        <li class="list-group-item">No learning resources available yet.</li>
-                    {% endfor %}
-                </ul>
+    <div class="accordion" id="subjectsAccordion">
+        {% for subject in course.subjects.all %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ forloop.counter }}">
+                        <strong>Subject: {{ subject.title }}</strong>
+                    </button>
+                </h2>
+                <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#subjectsAccordion">
+                    <div class="accordion-body">
+                        
+                        <h5 class="card-title">Learning Resources</h5>
+                        <ul class="list-group list-group-flush mb-3">
+                            {% for resource in subject.resources.all %}
+                                <li class="list-group-item">
+                                    {{ resource.title }}
+                                    {% if resource.file %}
+                                        <a href="{{ resource.file.url }}" class="btn btn-sm btn-outline-success float-end" target="_blank">Download File</a>
+                                    {% endif %}
+                                    {% if resource.link %}
+                                        <a href="{{ resource.link }}" class="btn btn-sm btn-outline-info float-end" target="_blank">Open Link</a>
+                                    {% endif %}
+                                </li>
+                            {% empty %}
+                                <li class="list-group-item">No learning resources available yet.</li>
+                            {% endfor %}
+                        </ul>
 
-                <h5 class="card-title">Assignments</h5>
-                <ul class="list-group list-group-flush">
-                    {% for assignment in subject.assignments.all %}
-                        <a href="{% url 'core:student_assignment_detail' assignment.pk %}" class="list-group-item list-group-item-action">
-                            {{ assignment.title }}
-                            <span class="text-muted float-end">Due: {{ assignment.due_date|date:"F j, Y" }}</span>
-                        </a>
-                    {% empty %}
-                        <li class="list-group-item">No assignments posted yet.</li>
-                    {% endfor %}
-                </ul>
-                <h5 class="card-title mt-3">Quizzes</h5>
-                <ul class="list-group list-group-flush">
-                    {% for quiz in subject.quizzes.all %}
-                        <a href="{% url 'core:take_quiz' quiz.pk %}" class="list-group-item list-group-item-action">
-                            {{ quiz.title }}
-                            <span class="text-muted float-end">Due: {{ quiz.due_date|date:"F j, Y" }}</span>
-                        </a>
-                    {% empty %}
-                        <li class="list-group-item">No quizzes posted yet.</li>
-                    {% endfor %}
-                </ul>
+                        <h5 class="card-title">Assignments</h5>
+                        <ul class="list-group list-group-flush">
+                            {% for assignment in subject.assignments.all %}
+                                <a href="{% url 'core:student_assignment_detail' assignment.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    <span>
+                                        {{ assignment.title }}
+                                        <br>
+                                        <small class="text-muted">Due: {{ assignment.due_date|date:"F j, Y" }}</small>
+                                    </span>
+                                </a>
+                            {% empty %}
+                                <li class="list-group-item">No assignments posted yet.</li>
+                            {% endfor %}
+                        </ul>
+                        
+                        <h5 class="card-title mt-3">Quizzes</h5>
+                        <ul class="list-group list-group-flush">
+                            {% for quiz in subject.quizzes.all %}
+                                <a href="{% url 'core:take_quiz' quiz.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    <span>
+                                        {{ quiz.title }}
+                                        <br>
+                                        <small class="text-muted">Due: {{ quiz.due_date|date:"F j, Y" }}</small>
+                                    </span>
+                                    {% if quiz.pk in attempted_quiz_pks %}
+                                        <span class="badge bg-success">View Result</span>
+                                    {% else %}
+                                        <span class="badge bg-primary">Take Quiz</span>
+                                    {% endif %}
+                                </a>
+                            {% empty %}
+                                <li class="list-group-item">No quizzes posted yet.</li>
+                            {% endfor %}
+                        </ul>
+
+                    </div>
+                </div>
             </div>
-        </div>
-    {% empty %}
-        <p>There are no subjects listed for this course yet.</p>
-    {% endfor %}
+        {% empty %}
+            <p>There are no subjects listed for this course yet.</p>
+        {% endfor %}
+    </div>
 
     <a href="{% url 'core:student_course_list' %}" class="btn btn-secondary mt-3">Back to My Courses</a>
 {% endblock %}

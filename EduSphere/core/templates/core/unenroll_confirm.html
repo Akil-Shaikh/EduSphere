@@ -1,0 +1,20 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Confirm Unenrollment{% endblock %}
+
+{% block content %}
+    <h2>Confirm Unenrollment</h2>
+    <hr>
+    <p>
+        Are you sure you want to unenroll the student
+        <strong>"{{ enrollment.student.user.get_full_name|default:enrollment.student.user.username }}"</strong>
+        from the course <strong>"{{ enrollment.course.title }}"</strong>?
+    </p>
+    <p class="text-danger">This action will remove their access to the course materials and assessments.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Confirm Unenroll</button>
+        <a href="{% url 'core:course_detail' enrollment.course.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

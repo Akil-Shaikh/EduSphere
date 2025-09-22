@@ -1,0 +1,24 @@
+{% extends 'core/base.html' %}
+{% block title %}Bulk Enroll Students{% endblock %}
+{% block content %}
+    <h2>Bulk Enroll Students in "{{ course.title }}"</h2>
+    <hr>
+
+    <div class="alert alert-info">
+        <h4 class="alert-heading">Instructions 📝</h4>
+        <p>Please upload a CSV file with exactly two columns in this order:</p>
+        <ol>
+            <li><strong>student_id</strong>: The unique ID of the student.</li>
+            <li><strong>roll_number</strong>: The roll number to assign for this specific course.</li>
+        </ol>
+        <p>The first row of the file **must be a header row** with these exact names (e.g., `student_id,roll_number`).</p>
+        <p><strong>Important:</strong> The system will only enroll students who belong to your university and are not already enrolled in this course. If any student ID in the file is not found, the entire upload will be cancelled.</p>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Upload and Enroll</button>
+        <a href="{% url 'core:course_detail' course.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

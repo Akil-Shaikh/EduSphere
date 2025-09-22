@@ -25,7 +25,19 @@
             </a>
         </div>
     {% endif %}
-    
+    {% if role == 'Head of Department' %}
+    {% endif %}
+
+    {% if role == 'University Admin' %}
+        <div class="list-group">
+            <a href="{% url 'core:uni_admin_dashboard' %}" class="list-group-item list-group-item-action">
+                Go to Admin Dashboard
+            </a>
+        </div>
+    {% endif %}
+
+    {% if role == 'Student' %}
+    {% endif %}
     {% if role == 'Faculty' %}
         <div class="list-group">
             <a href="{% url 'core:faculty_subject_list' %}" class="list-group-item list-group-item-action">

@@ -1,0 +1,20 @@
+{% extends 'core/base.html' %}
+{% block title %}Bulk Register Students{% endblock %}
+{% block content %}
+    <h2>Bulk Register Students via CSV Upload</h2>
+    <hr>
+
+    <div class="alert alert-info">
+        <h4 class="alert-heading">Instructions</h4>
+        <p>Please upload a CSV file with the following columns in this exact order:</p>
+        <p><code>username,password,first_name,last_name,email,student_id</code></p>
+        <p>The first row of the file must be the header row with these names. Do not include any other columns.</p>
+        </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Upload and Register</button>
+        <a href="{% url 'core:student_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

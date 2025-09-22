@@ -3,55 +3,65 @@
 {% block title %}Details for {{ course.title }}{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Subjects in Course</h2>
-        <a href="{% url 'core:subject_create' course.pk %}" class="btn btn-primary">Add New Subject</a>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Subjects in Course</h2>
+    <a href="{% url 'core:subject_create' course.pk %}" class="btn btn-primary">Add New Subject</a>
+</div>
+<div class="list-group mb-5">
+    {% for subject in course.subjects.all %}
+    <div class="list-group-item">
+        <h5>{{ subject.title }} ({{ subject.code }})</h5>
+        <div>
+            <a href="{% url 'core:subject_update' subject.pk %}" class="btn btn-sm btn-secondary">Edit</a>
+            <a href="{% url 'core:subject_delete' subject.pk %}" class="btn btn-sm btn-danger">Delete</a>
+        </div>
+        <small>
+            <strong>Faculty:</strong>
+            {% for member in subject.faculty.all %}
+            {{ member.user.get_full_name|default:member.user.username }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+            No faculty assigned.
+            {% endfor %}
+        </small>
     </div>
-    <div class="list-group mb-5">
-        {% for subject in course.subjects.all %}
-            <div class="list-group-item">
-                <h5>{{ subject.title }} ({{ subject.code }})</h5>
-                <small>
-                    <strong>Faculty:</strong>
-                    {% for member in subject.faculty.all %}
-                        {{ member.user.get_full_name|default:member.user.username }}{% if not forloop.last %}, {% endif %}
-                    {% empty %}
-                        No faculty assigned.
-                    {% endfor %}
-                </small>
-            </div>
-        {% empty %}
-            <div class="list-group-item">No subjects have been added to this course yet.</div>
-        {% endfor %}
-    </div>
+    {% empty %}
+    <div class="list-group-item">No subjects have been added to this course yet.</div>
+    {% endfor %}
+</div>
 
-    <hr>
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Enrolled Students</h2>
+<hr>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Enrolled Students</h2>
+    <div> <a href="{% url 'core:student_bulk_enroll' course.pk %}" class="btn btn-info">Bulk Enroll</a>
         <a href="{% url 'core:enroll_student' course.pk %}" class="btn btn-success">Enroll New Student</a>
     </div>
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Student Name</th>
-                <th>Student ID</th>
-                <th>Roll Number</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for enrollment in course.enrollment_set.all %}
-                <tr>
-                    <td>{{ enrollment.student.user.get_full_name|default:enrollment.student.user.username }}</td>
-                    <td>{{ enrollment.student.student_id }}</td>
-                    <td>{{ enrollment.roll_number }}</td>
-                </tr>
-            {% empty %}
-                <tr>
-                    <td colspan="3" class="text-center">No students are currently enrolled in this course.</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+</div>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Student Name</th>
+            <th>Student ID</th>
+            <th>Roll Number</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for enrollment in course.enrollment_set.all %}
+        <tr>
+            <td>{{ enrollment.student.user.get_full_name|default:enrollment.student.user.username }}</td>
+            <td>{{ enrollment.student.student_id }}</td>
+            <td>{{ enrollment.roll_number }}</td>
+            <td>
+                <a href="{% url 'core:unenroll_student' enrollment.pk %}" class="btn btn-danger btn-sm">Unenroll</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4" class="text-center">No students are currently enrolled in this course.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
-    <a href="{% url 'core:hod_course_list' %}" class="btn btn-secondary mt-3">Back to Course List</a>
+<a href="{% url 'core:hod_course_list' %}" class="btn btn-secondary mt-3">Back to Course List</a>
 {% endblock %}

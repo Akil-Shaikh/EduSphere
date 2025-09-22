@@ -1,0 +1,18 @@
+{% extends 'core/base.html' %}
+
+{% block title %}My Notifications{% endblock %}
+
+{% block content %}
+    <h2>My Notifications</h2>
+    <hr>
+    <div class="list-group">
+        {% for notification in notifications %}
+            <div class="list-group-item">
+                <p>{{ notification.message|linebreaksbr }}</p>
+                <small class="text-muted">{{ notification.timestamp|timesince }} ago</small>
+            </div>
+        {% empty %}
+            <div class="list-group-item">You have no notifications.</div>
+        {% endfor %}
+    </div>
+{% endblock %}

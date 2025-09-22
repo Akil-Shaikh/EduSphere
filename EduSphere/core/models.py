@@ -3,6 +3,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.forms import ValidationError
 
 # -----------------------------------------------------------------------------
 # SECTION 1: CORE ORGANIZATIONAL & USER PROFILE MODELS
@@ -16,9 +17,14 @@ class University(models.Model):
         return self.name
 
 class UniversityAdmin(models.Model):
-    """Profile for a University Administrator."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
-    university = models.OneToOneField(University, on_delete=models.CASCADE) # An admin for one university
+    university = models.OneToOneField(University, on_delete=models.CASCADE)
+
+    # --- ADD THIS METHOD ---
+    def save(self, *args, **kwargs):
+        if hasattr(self.user, 'student') or hasattr(self.user, 'faculty'):
+            raise ValidationError("This user is already assigned to another role (Student or Faculty).")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user.username} (Admin for {self.university.name})"
@@ -37,26 +43,40 @@ class Department(models.Model):
         return f"{self.name} ({self.university.name})"
 
 class Faculty(models.Model):
-    """Profile for a Faculty member."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     university = models.ForeignKey(University, on_delete=models.CASCADE)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='faculty_members')
-    employee_id = models.CharField(max_length=20, unique=True)
+    employee_id = models.CharField(max_length=20)
     
+    class Meta:
+        unique_together = ('university', 'employee_id')
+
+    # --- ADD THIS METHOD ---
+    def save(self, *args, **kwargs):
+        if hasattr(self.user, 'student') or hasattr(self.user, 'universityadmin'):
+            raise ValidationError("This user is already assigned to another role (Student or Admin).")
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.username} ({self.employee_id})"
 
 class Student(models.Model):
-    """Profile for a Student."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     university = models.ForeignKey(University, on_delete=models.CASCADE)
-    student_id = models.CharField(max_length=20, unique=True)
-    # Courses are linked via the Enrollment model below
+    student_id = models.CharField(max_length=20)
     enrolled_courses = models.ManyToManyField('Course', through='Enrollment', related_name='students')
+    class Meta:
+        unique_together = ('university', 'student_id')
+
+    # --- ADD THIS METHOD ---
+    def save(self, *args, **kwargs):
+        # Check if the user already has a different profile
+        if hasattr(self.user, 'faculty') or hasattr(self.user, 'universityadmin'):
+            raise ValidationError("This user is already assigned to another role (Faculty or Admin).")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.username} ({self.student_id})"
-
 # -----------------------------------------------------------------------------
 # SECTION 2: ACADEMIC STRUCTURE MODELS
 # -----------------------------------------------------------------------------
@@ -64,8 +84,19 @@ class Student(models.Model):
 class Course(models.Model):
     """Represents a program of study, e.g., MScIT 1st Year Sem 2."""
     title = models.CharField(max_length=200)
-    code = models.CharField(max_length=20, unique=True)
+    # REMOVED: unique=True from here
+    code = models.CharField(max_length=20)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='courses')
+    # ADDED: Direct link to University to enforce uniqueness
+    university = models.ForeignKey(University, on_delete=models.CASCADE)
+
+    # ADDED: Meta class for combined uniqueness
+    class Meta:
+        unique_together = ('university', 'code')
+
+    def __str__(self):
+        return f"{self.title} ({self.code})"
+
     # Versioning can be handled by creating a new Course instance for a new syllabus
     # or by adding a version field, e.g., version = models.PositiveIntegerField(default=1)
 
@@ -234,3 +265,15 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"{self.student} - {self.subject.code} on {self.date}: {self.status}"
+    
+class Notification(models.Model):
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notification for {self.recipient.username}"
+
+    class Meta:
+        ordering = ['-timestamp']
