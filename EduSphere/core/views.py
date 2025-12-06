@@ -265,7 +265,6 @@ class StudentDeleteView(LoginRequiredMixin, UniversityAdminRequiredMixin, Delete
         return Student.objects.filter(university=self.request.user.universityadmin.university)
 
     def form_valid(self, form):
-        # When deleting a Student profile, we should also delete the associated User account
         user = self.object.user
         response = super().form_valid(form)
         user.delete()
