@@ -1,0 +1,65 @@
+{% extends 'core/base.html' %}
+{% block title %}Bulk Upload Questions{% endblock %}
+
+{% block content %}
+    <h1 class="h3 mb-4 text-gray-800">Bulk Upload Questions for "{{ quiz.title }}"</h1>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Instructions & CSV Format</h6>
+        </div>
+        <div class="card-body">
+            <p>Please upload a CSV file with the following <strong>8 columns</strong> in exact order:</p>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>1. Type</th>
+                            <th>2. Question Text</th>
+                            <th>3. Marks</th>
+                            <th>4. Option 1</th>
+                            <th>5. Option 2</th>
+                            <th>6. Option 3</th>
+                            <th>7. Option 4</th>
+                            <th>8. Correct Ans (1-4)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>MCQ</td>
+                            <td>What is 2+2?</td>
+                            <td>1</td>
+                            <td>3</td>
+                            <td>4</td>
+                            <td>5</td>
+                            <td>6</td>
+                            <td>2</td>
+                        </tr>
+                        <tr>
+                            <td>DESCRIPTIVE</td>
+                            <td>Explain gravity.</td>
+                            <td>5</td>
+                            <td>(Leave Empty)</td>
+                            <td>(Leave Empty)</td>
+                            <td>(Leave Empty)</td>
+                            <td>(Leave Empty)</td>
+                            <td>(Leave Empty)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-danger small">* The first row of your file must be a header row and will be ignored.</p>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-success">Upload Questions</button>
+                <a href="{% url 'core:quiz_detail' quiz.pk %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

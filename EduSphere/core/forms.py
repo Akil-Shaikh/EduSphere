@@ -1,9 +1,42 @@
-# core/forms.py
+
 
 from django import forms
 from django.forms import inlineformset_factory
-from .models import AssignmentSubmission,Question,MCQOption,Quiz,Assignment , Department, Faculty,Subject
+from .models import AssignmentSubmission,Question,MCQOption,Quiz,Assignment , Department, Faculty,Subject,Student
 from django.contrib.auth.models import User
+
+class FacultyUpdateForm(forms.ModelForm):
+    first_name = forms.CharField(max_length=30, required=True)
+    last_name = forms.CharField(max_length=150, required=True)
+    email = forms.EmailField(required=True)
+    password = forms.CharField(widget=forms.PasswordInput, required=False, help_text="Leave blank to keep current password.")
+
+    class Meta:
+        model = Faculty
+        fields = ['employee_id', 'department']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.user:
+            self.fields['first_name'].initial = self.instance.user.first_name
+            self.fields['last_name'].initial = self.instance.user.last_name
+            self.fields['email'].initial = self.instance.user.email
+            
+            self.fields['department'].queryset = Department.objects.filter(university=self.instance.university)
+
+    def save(self, commit=True):
+        faculty = super().save(commit=commit)
+        user = faculty.user
+        user.first_name = self.cleaned_data['first_name']
+        user.last_name = self.cleaned_data['last_name']
+        user.email = self.cleaned_data['email']
+        password = self.cleaned_data.get('password')
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return faculty
+
 class StudentRegistrationForm(forms.ModelForm):
     student_id = forms.CharField(max_length=20, help_text="The unique ID for the student.")
     
@@ -18,7 +51,7 @@ class StudentRegistrationForm(forms.ModelForm):
         for field in self.fields.values():
             field.required = True
 
-    # --- NEW VALIDATION METHODS ---
+    
     def clean_username(self):
         username = self.cleaned_data.get('username')
         if User.objects.filter(username__iexact=username).exists():
@@ -31,6 +64,36 @@ class StudentRegistrationForm(forms.ModelForm):
             raise forms.ValidationError("A user with this email address already exists.")
         return email
 
+class StudentUpdateForm(forms.ModelForm):
+    
+    first_name = forms.CharField(max_length=30, required=True)
+    last_name = forms.CharField(max_length=150, required=True)
+    email = forms.EmailField(required=True)
+    password = forms.CharField(widget=forms.PasswordInput, required=False, help_text="Leave blank to keep the current password.")
+
+    class Meta:
+        model = Student
+        fields = ['student_id'] 
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.user:
+            self.fields['first_name'].initial = self.instance.user.first_name
+            self.fields['last_name'].initial = self.instance.user.last_name
+            self.fields['email'].initial = self.instance.user.email
+
+    def save(self, commit=True):
+        student = super().save(commit=commit)
+        user = student.user
+        user.first_name = self.cleaned_data['first_name']
+        user.last_name = self.cleaned_data['last_name']
+        user.email = self.cleaned_data['email']
+        password = self.cleaned_data.get('password')
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return student
 
 class FacultyRegistrationForm(forms.ModelForm):
     employee_id = forms.CharField(max_length=20)
@@ -50,7 +113,7 @@ class FacultyRegistrationForm(forms.ModelForm):
         for field in self.fields.values():
             field.required = True
             
-    # --- NEW VALIDATION METHODS ---
+    
     def clean_username(self):
         username = self.cleaned_data.get('username')
         if User.objects.filter(username__iexact=username).exists():
@@ -70,7 +133,7 @@ class DepartmentForm(forms.ModelForm):
     class Meta:
         model = Department
         fields = ['name', 'hod']
-        # ADDED: Widget to apply the select2 class
+        
         widgets = {
             'hod': forms.Select(attrs={'class': 'select2-widget', 'style': 'width: 100%'})
         }
@@ -78,18 +141,10 @@ class DepartmentForm(forms.ModelForm):
         university = kwargs.pop('university', None)
         super().__init__(*args, **kwargs)
         if university:
-            # --- NEW LOGIC TO EXCLUDE TEACHING FACULTY ---
-
-            # 1. Get the primary keys of all faculty members who are teaching a subject.
-            # The 'subjects_taught' is the related_name from the ManyToManyField on the Subject model.
             teaching_faculty_ids = Faculty.objects.filter(
                 subjects_taught__isnull=False
             ).values_list('pk', flat=True).distinct()
-
-            # 2. Start with the base queryset of all faculty in the university.
             queryset = Faculty.objects.filter(university=university)
-            
-            # 3. Exclude the faculty members who are actively teaching.
             self.fields['hod'].queryset = queryset.exclude(pk__in=teaching_faculty_ids)
 
 
@@ -100,7 +155,7 @@ class AssignmentSubmissionForm(forms.ModelForm):
         widgets = {
             'submitted_file': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
-    
+
 class GradingForm(forms.ModelForm):
     class Meta:
         model = AssignmentSubmission
@@ -109,7 +164,24 @@ class GradingForm(forms.ModelForm):
             'grade': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Grade'}),
             'feedback': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2, 'placeholder': 'Feedback...'}),
         }
-    
+    def clean(self):
+        """
+        Custom validation to ensure the grade is not higher than the total marks.
+        """
+        cleaned_data = super().clean()
+        grade = cleaned_data.get("grade")
+        
+        assignment = self.instance.assignment
+        total_marks = assignment.total_marks
+
+        if grade is not None and total_marks is not None:
+            if grade > total_marks:
+                raise forms.ValidationError(
+                    f"The grade ({grade}) cannot be greater than the total possible marks ({total_marks})."
+                )
+        
+        return cleaned_data
+
 class QuestionForm(forms.ModelForm):
     class Meta:
         model = Question
@@ -120,13 +192,12 @@ class QuestionForm(forms.ModelForm):
             'marks': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
-# Create a formset for MCQ Options linked to a Question
 MCQOptionFormSet = inlineformset_factory(
-    Question,       # Parent model
-    MCQOption,      # Child model
-    fields=('text', 'is_correct'), # Fields to include
-    extra=4,        # Number of empty forms to display
-    can_delete=False, # We don't need to delete options from this form
+    Question,       
+    MCQOption,      
+    fields=('text', 'is_correct'), 
+    extra=4,        
+    can_delete=False, 
     widgets={
         'text': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Option text'}),
     }
@@ -157,25 +228,20 @@ class SubjectForm(forms.ModelForm):
         model = Subject
         fields = ['title', 'code', 'faculty']
         widgets = {
-            # This applies the Select2 widget to the faculty multi-select field
+            
             'faculty': forms.SelectMultiple(attrs={'class': 'select2-widget', 'style': 'width: 100%'})
         }
 
     def __init__(self, *args, **kwargs):
-        # Pop the university from kwargs, passed from the view
+        
         university = kwargs.pop('university', None)
         super().__init__(*args, **kwargs)
 
         if university:
-            # Get the primary keys of all faculty who are HODs in this university
             hod_ids = Department.objects.filter(
                 university=university, 
                 hod__isnull=False
             ).values_list('hod__pk', flat=True)
-
-            # Set the queryset for the 'faculty' field to:
-            # - Filter by the correct university
-            # - Exclude any faculty member who is an HOD
             self.fields['faculty'].queryset = Faculty.objects.filter(
                 university=university
             ).exclude(

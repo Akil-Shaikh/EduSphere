@@ -12,7 +12,9 @@
                 <strong>{{ dept.name }}</strong><br>
                 <small class="text-muted">HOD: {{ dept.hod|default:"Not Assigned" }}</small>
             </div>
-            <a href="{% url 'core:department_update' dept.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+            <div><a href="{% url 'core:department_update' dept.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+            <a href="{% url 'core:department_delete' dept.pk %}" class="btn btn-danger btn-sm">Delete</a>
+            </div>
         </li>
         {% empty %}
         <li class="list-group-item">No departments found.</li>

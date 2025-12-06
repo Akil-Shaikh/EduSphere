@@ -1,0 +1,16 @@
+{% extends 'core/base.html' %}
+{% block title %}Delete Student{% endblock %}
+{% block content %}
+    <h1 class="h3 mb-4 text-gray-800">Delete Student</h1>
+    <div class="card shadow mb-4 border-left-danger">
+        <div class="card-body">
+            <p>Are you sure you want to delete <strong>{{ object.user.get_full_name }}</strong> ({{ object.student_id }})?</p>
+            <p class="text-danger">Warning: This will permanently delete their User account, transcript, and all submission history.</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Confirm Delete</button>
+                <a href="{% url 'core:student_list' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

@@ -1,22 +1,23 @@
 {% extends 'core/base.html' %}
-
 {% block title %}My Courses{% endblock %}
 
 {% block content %}
-    <h2>My Enrolled Courses</h2>
-    <p>Here are all the courses you are currently enrolled in.</p>
-
-    <div class="list-group">
+    <h1 class="h3 mb-4 text-gray-800">My Enrolled Courses</h1>
+    <div class="row">
         {% for course in enrolled_courses %}
-            <a href="{% url 'core:student_course_detail' course.pk %}" class="list-group-item list-group-item-action">
-                <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">{{ course.title }}</h5>
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h5 class="card-title">{{ course.title }}</h5>
+                    <p class="card-text">Course Code: {{ course.code }}</p>
+                    <a href="{% url 'core:student_course_detail' course.pk %}" class="btn btn-primary">View Course</a>
                 </div>
-                <p class="mb-1">Course Code: {{ course.code }}</p>
-                <small>Department of {{ course.department.name }}</small>
-            </a>
+            </div>
+        </div>
         {% empty %}
-            <div class="list-group-item">You are not currently enrolled in any courses.</div>
+        <div class="col-12">
+            <p>You are not currently enrolled in any courses.</p>
+        </div>
         {% endfor %}
     </div>
 {% endblock %}

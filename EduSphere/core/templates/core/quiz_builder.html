@@ -14,6 +14,9 @@
             <a href="{% url 'core:quiz_attempts_list' quiz.pk %}" class="btn btn-info">
                 View Attempts <span class="badge bg-light text-dark">{{ quiz.attempts.count }}</span>
             </a>
+            <a href="{% url 'core:quiz_bulk_upload' quiz.pk %}" class="btn btn-success btn-sm">
+                <i class="fas fa-file-upload"></i> Bulk Upload
+            </a>    
             <a href="{% url 'core:question_create' quiz.pk %}" class="btn btn-primary">Add Question</a>
         </div>
     </div>
@@ -21,7 +24,7 @@
         {% for question in quiz.questions.all %}
         <div class="list-group-item">
             <p><strong>Q{{ forloop.counter }}: {{ question.text|linebreaksbr }}</strong></p>
-            <span class="badge bg-secondary">{{ question.get_question_type_display }}</span>
+            <span class="badge">{{ question.get_question_type_display }}</span>
 
             {% if question.question_type == 'MCQ' %}
             <ul class="list-unstyled mt-2">
@@ -31,7 +34,7 @@
                     {% if option.is_correct %}
                     <span class="badge bg-success">Correct</span>
                     {% endif %}
-                </li>
+                </li>   
                 {% endfor %}
             </ul>
             {% endif %}

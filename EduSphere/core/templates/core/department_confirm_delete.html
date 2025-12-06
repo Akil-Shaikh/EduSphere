@@ -1,0 +1,16 @@
+{% extends 'core/base.html' %}
+{% block title %}Delete Department{% endblock %}
+{% block content %}
+    <h1 class="h3 mb-4 text-gray-800">Delete Department</h1>
+    <div class="card shadow mb-4 border-left-danger">
+        <div class="card-body">
+            <p>Are you sure you want to delete the department <strong>"{{ object.name }}"</strong>?</p>
+            <p class="text-danger">Warning: This will also delete all Courses, Subjects, and assignments associated with this department.</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Confirm Delete</button>
+                <a href="{% url 'core:department_list' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

@@ -38,6 +38,10 @@
                         <p><strong>Feedback:</strong> {{ existing_submission.feedback }}</p>
                     {% endif %}
                 </div>
+            {% elif assignment.due_date < timezone.now %}
+            <div class="alert alert-warning">
+                The deadline for this assignment has passed. Submissions are no longer accepted.
+            </div>
             {% else %}
                 <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}

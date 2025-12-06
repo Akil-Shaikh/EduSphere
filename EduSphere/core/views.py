@@ -1,23 +1,25 @@
-# core/views.py
 
+
+from datetime import timedelta
+from django.utils import timezone
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect,render,get_object_or_404
 from django.views.generic import FormView,TemplateView
-from django.urls import reverse_lazy # Use reverse_lazy for class attributes
-from django.views.generic.edit import CreateView, UpdateView , DeleteView, FormMixin # Import editing views
+from django.urls import reverse_lazy 
+from django.views.generic.edit import CreateView, UpdateView , DeleteView, FormMixin 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.views.generic import TemplateView, ListView, DetailView # Add DetailView
+from django.views.generic import TemplateView, ListView, DetailView 
 from .models import Course, Department, Subject, Student,Faculty, Enrollment, LearningResource,Assignment,Notification,AssignmentSubmission,Quiz,Question,MCQOption,QuizAttempt,StudentAnswer
-from .forms import FileUploadForm,AssignmentSubmissionForm,FacultyRegistrationForm,GradingForm,QuestionForm,MCQOptionFormSet,AssignmentForm,QuizForm,DepartmentForm,StudentRegistrationForm, SubjectForm
+from .forms import FileUploadForm,FacultyUpdateForm,AssignmentSubmissionForm,StudentUpdateForm,FacultyRegistrationForm,GradingForm,QuestionForm,MCQOptionFormSet,AssignmentForm,QuizForm,DepartmentForm,StudentRegistrationForm, SubjectForm
 from django import forms
 from django.forms import modelformset_factory
 from django.views import View
 from django.contrib import messages
 from django.db import models,transaction
+from django.db.models import Count,Q
 from django.contrib.auth.models import User 
 import csv
 import io
-
 
 class UniversityAdminRequiredMixin(UserPassesTestMixin):
     """Verify that the current user is a University Admin."""
@@ -32,11 +34,9 @@ class StudentRequiredMixin(UserPassesTestMixin):
 class FacultyRequiredMixin(UserPassesTestMixin):
     """Verify that the current user is a Faculty member."""
     def test_func(self):
-        # We also check that the user is not an HOD, as we might want
-        # separate views for them later. For now, an HOD is also a faculty member.
         return self.request.user.is_authenticated and hasattr(self.request.user, 'faculty')
     
-# ... HODRequiredMixin and DashboardView remain the same ...
+
 class HODRequiredMixin(UserPassesTestMixin):
     """Verify that the current user is an HOD."""
     def test_func(self):
@@ -47,16 +47,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     """
     Handles user redirection based on their role upon login or visiting the root URL.
     """
-    template_name = 'core/dashboard.html' # Fallback for unassigned users
+    template_name = 'core/dashboard.html'
 
     def get(self, request, *args, **kwargs):
         user = request.user
 
-        # 1. Check if the user is a superuser and redirect to the admin panel
         if user.is_superuser:
             return redirect('admin:index')
 
-        # 2. Check for other roles in order of precedence
         if hasattr(user, 'universityadmin'):
             return redirect('core:uni_admin_dashboard')
         
@@ -64,12 +62,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             return redirect('core:hod_course_list')
 
         if hasattr(user, 'faculty'):
-            return redirect('core:faculty_subject_list')
+            return redirect('core:faculty_dashboard')
 
         if hasattr(user, 'student'):
             return redirect('core:student_course_list')
-        
-        # 3. If no specific role is found, show a generic page
+
         context = self.get_context_data(**kwargs)
         context['role'] = 'Unassigned User'
         return self.render_to_response(context)
@@ -84,7 +81,6 @@ class DepartmentListView(LoginRequiredMixin, UniversityAdminRequiredMixin, ListV
     context_object_name = 'departments'
 
     def get_queryset(self):
-        # Filter departments to the admin's university
         return Department.objects.filter(university=self.request.user.universityadmin.university)
 
 class DepartmentCreateView(LoginRequiredMixin, UniversityAdminRequiredMixin, CreateView):
@@ -95,7 +91,6 @@ class DepartmentCreateView(LoginRequiredMixin, UniversityAdminRequiredMixin, Cre
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        # Pass the admin's university to the form
         kwargs['university'] = self.request.user.universityadmin.university
         return kwargs
 
@@ -112,7 +107,6 @@ class DepartmentUpdateView(LoginRequiredMixin, UniversityAdminRequiredMixin, Upd
     success_url = reverse_lazy('core:department_list')
 
     def get_queryset(self):
-        # Ensure admin can only edit departments in their own university
         return Department.objects.filter(university=self.request.user.universityadmin.university)
 
     def get_form_kwargs(self):
@@ -123,13 +117,39 @@ class DepartmentUpdateView(LoginRequiredMixin, UniversityAdminRequiredMixin, Upd
     def form_valid(self, form):
         messages.success(self.request, "Department updated successfully.")
         return super().form_valid(form)
+
 class FacultyListView(LoginRequiredMixin, UniversityAdminRequiredMixin, ListView):
     model = Faculty
     template_name = 'core/faculty_list.html'
     context_object_name = 'faculty_members'
+    paginate_by = 25
 
     def get_queryset(self):
-        return Faculty.objects.filter(university=self.request.user.universityadmin.university)
+        university = self.request.user.universityadmin.university
+        queryset = Faculty.objects.filter(university=university).order_by('user__last_name')
+
+        search_query = self.request.GET.get('q', '')
+        department_id = self.request.GET.get('department', '')
+
+        if search_query:
+            queryset = queryset.filter(
+                Q(user__first_name__icontains=search_query) |
+                Q(user__last_name__icontains=search_query) |
+                Q(user__username__icontains=search_query) |
+                Q(employee_id__icontains=search_query)
+            )
+        if department_id:
+            queryset = queryset.filter(department__id=department_id)
+            
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        university = self.request.user.universityadmin.university
+        context['departments'] = Department.objects.filter(university=university)
+        context['current_department_id'] = self.request.GET.get('department', '')
+        context['current_search_query'] = self.request.GET.get('q', '')
+        return context
 
 class FacultyRegistrationView(LoginRequiredMixin, UniversityAdminRequiredMixin, View):
     form_class = FacultyRegistrationForm
@@ -167,14 +187,90 @@ class FacultyRegistrationView(LoginRequiredMixin, UniversityAdminRequiredMixin, 
 
         return render(request, self.template_name, {'form': form})
 
+class FacultyUpdateView(LoginRequiredMixin, UniversityAdminRequiredMixin, UpdateView):
+    model = Faculty
+    form_class = FacultyUpdateForm
+    template_name = 'core/faculty_update_form.html'
+    success_url = reverse_lazy('core:faculty_list')
+
+    def get_queryset(self):
+        return Faculty.objects.filter(university=self.request.user.universityadmin.university)
+    
+    def form_valid(self, form):
+        messages.success(self.request, "Faculty profile updated successfully.")
+        return super().form_valid(form)
+
 class StudentListView(LoginRequiredMixin, UniversityAdminRequiredMixin, ListView):
     model = Student
     template_name = 'core/student_list.html'
     context_object_name = 'students'
+    paginate_by = 25
 
     def get_queryset(self):
-        # Filter students to the admin's university
+        university = self.request.user.universityadmin.university
+        queryset = Student.objects.filter(university=university).order_by('user__last_name')
+
+        search_query = self.request.GET.get('q', '')
+        if search_query:
+            queryset = queryset.filter(
+                Q(user__first_name__icontains=search_query) |
+                Q(user__last_name__icontains=search_query) |
+                Q(user__username__icontains=search_query) |
+                Q(student_id__icontains=search_query)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['current_search_query'] = self.request.GET.get('q', '')
+        return context
+
+class DepartmentDeleteView(LoginRequiredMixin, UniversityAdminRequiredMixin, DeleteView):
+    model = Department
+    template_name = 'core/department_confirm_delete.html'
+    success_url = reverse_lazy('core:department_list')
+
+    def get_queryset(self):
+        # Security: Only allow deleting departments in own university
+        return Department.objects.filter(university=self.request.user.universityadmin.university)
+    
+    def form_valid(self, form):
+        messages.success(self.request, "Department deleted successfully.")
+        return super().form_valid(form)
+
+
+class FacultyDeleteView(LoginRequiredMixin, UniversityAdminRequiredMixin, DeleteView):
+    model = Faculty
+    template_name = 'core/faculty_confirm_delete.html'
+    success_url = reverse_lazy('core:faculty_list')
+
+    def get_queryset(self):
+        return Faculty.objects.filter(university=self.request.user.universityadmin.university)
+
+    def form_valid(self, form):
+        # When deleting a Faculty profile, we should also delete the associated User account
+        user = self.object.user
+        response = super().form_valid(form) # This deletes the Faculty object
+        user.delete() # This deletes the User login
+        messages.success(self.request, "Faculty member and user account deleted successfully.")
+        return response
+
+
+class StudentDeleteView(LoginRequiredMixin, UniversityAdminRequiredMixin, DeleteView):
+    model = Student
+    template_name = 'core/student_confirm_delete.html'
+    success_url = reverse_lazy('core:student_list')
+
+    def get_queryset(self):
         return Student.objects.filter(university=self.request.user.universityadmin.university)
+
+    def form_valid(self, form):
+        # When deleting a Student profile, we should also delete the associated User account
+        user = self.object.user
+        response = super().form_valid(form)
+        user.delete()
+        messages.success(self.request, "Student profile and user account deleted successfully.")
+        return response
 
 class StudentRegistrationView(LoginRequiredMixin, UniversityAdminRequiredMixin, View):
     form_class = StudentRegistrationForm
@@ -188,15 +284,10 @@ class StudentRegistrationView(LoginRequiredMixin, UniversityAdminRequiredMixin, 
         form = self.form_class(request.POST)
         if form.is_valid():
             try:
-                # Use a transaction to ensure both User and Student are created
                 with transaction.atomic():
                     user_data = form.cleaned_data
                     student_id = user_data.pop('student_id')
-                    
-                    # create_user handles password hashing
                     user = User.objects.create_user(**user_data)
-                    
-                    # Create the student profile
                     Student.objects.create(
                         user=user,
                         student_id=student_id,
@@ -206,10 +297,9 @@ class StudentRegistrationView(LoginRequiredMixin, UniversityAdminRequiredMixin, 
                 messages.success(request, f"Student '{user.username}' registered successfully.")
                 return redirect('core:student_list')
             except Exception as e:
-                # If anything goes wrong, the transaction will roll back
                 messages.error(request, f"An error occurred: {e}")
-
         return render(request, self.template_name, {'form': form})
+
 class StudentBulkRegistrationView(LoginRequiredMixin, UniversityAdminRequiredMixin, View):
     template_name = 'core/student_bulk_register.html'
 
@@ -221,24 +311,17 @@ class StudentBulkRegistrationView(LoginRequiredMixin, UniversityAdminRequiredMix
         form = FileUploadForm(request.POST, request.FILES)
         if form.is_valid():
             csv_file = request.FILES['file']
-            
-            # Check if it's a CSV file
             if not csv_file.name.endswith('.csv'):
                 messages.error(request, 'This is not a CSV file.')
                 return render(request, self.template_name, {'form': form})
 
-            # Process the CSV file
             try:
-                with transaction.atomic(): # Use a transaction
-                    # Read the file in memory
+                with transaction.atomic():
                     data_set = csv_file.read().decode('UTF-8')
                     io_string = io.StringIO(data_set)
-                    # Skip the header
                     next(io_string)
-                    
                     created_count = 0
                     for column in csv.reader(io_string, delimiter=',', quotechar='"'):
-                        # Assumes CSV columns are: username,password,first_name,last_name,email,student_id
                         user = User.objects.create_user(
                             username=column[0],
                             password=column[1],
@@ -257,13 +340,11 @@ class StudentBulkRegistrationView(LoginRequiredMixin, UniversityAdminRequiredMix
                 return redirect('core:student_list')
 
             except Exception as e:
-                # If any error occurs, the transaction will be rolled back.
                 messages.error(request, f"An error occurred while processing the file: {e}")
 
         return render(request, self.template_name, {'form': form})
 
 class HODCourseListView(LoginRequiredMixin, HODRequiredMixin, ListView):
-    # ... (code from previous step remains the same)
     model = Course
     template_name = 'core/hod_course_list.html'
     context_object_name = 'courses'
@@ -272,34 +353,29 @@ class HODCourseListView(LoginRequiredMixin, HODRequiredMixin, ListView):
         hods_department = Department.objects.get(hod=self.request.user.faculty)
         return Course.objects.filter(department=hods_department).order_by('code')
 
-# --- NEW VIEWS START HERE ---
 
 class CourseCreateView(LoginRequiredMixin, HODRequiredMixin, CreateView):
     model = Course
-    fields = ['title', 'code'] # Fields the HOD can fill in
+    fields = ['title', 'code']
     template_name = 'core/course_form.html'
     success_url = reverse_lazy('core:hod_course_list')
 
     def form_valid(self, form):
-        # Automatically set the department to the HOD's department.
-        # This is crucial for security and data integrity.
         hods_department = Department.objects.get(hod=self.request.user.faculty)
         form.instance.department = hods_department
+        form.instance.university = hods_department.university
         response = super().form_valid(form)
-
-        # NEW: Add a success message
         messages.success(self.request, f"Course '{self.object.title}' created successfully.")
 
         return response
 
 class CourseUpdateView(LoginRequiredMixin, HODRequiredMixin, UpdateView):
     model = Course
-    fields = ['title', 'code'] # Fields the HOD can edit
+    fields = ['title', 'code']
     template_name = 'core/course_form.html'
     success_url = reverse_lazy('core:hod_course_list')
 
     def get_queryset(self):
-        # Ensure HOD can only edit courses within their own department.
         hods_department = Department.objects.get(hod=self.request.user.faculty)
         return Course.objects.filter(department=hods_department)
     
@@ -309,9 +385,30 @@ class CourseDetailView(LoginRequiredMixin, HODRequiredMixin, DetailView):
     context_object_name = 'course'
 
     def get_queryset(self):
-        # Ensure HOD can only view details of courses in their own department
         hods_department = Department.objects.get(hod=self.request.user.faculty)
         return Course.objects.filter(department=hods_department)
+
+    def get_context_data(self, **kwargs):
+        """
+        Adds the filtered list of enrollments to the context.
+        """
+        context = super().get_context_data(**kwargs)
+        course = self.get_object()
+        search_query = self.request.GET.get('q', '')
+        
+        enrollments = Enrollment.objects.filter(course=course).order_by('student__user__last_name')
+        
+        if search_query:
+            enrollments = enrollments.filter(
+                Q(student__user__first_name__icontains=search_query) |
+                Q(student__user__last_name__icontains=search_query) |
+                Q(student__student_id__icontains=search_query) |
+                Q(roll_number__icontains=search_query)
+            )
+        
+        context['enrollments'] = enrollments
+        context['current_search_query'] = search_query
+        return context
 
 class CourseDeleteView(LoginRequiredMixin, HODRequiredMixin, DeleteView):
     model = Course
@@ -319,51 +416,42 @@ class CourseDeleteView(LoginRequiredMixin, HODRequiredMixin, DeleteView):
     success_url = reverse_lazy('core:hod_course_list')
 
     def get_queryset(self):
-        # Ensure HOD can only delete courses within their own department
         hods_department = Department.objects.get(hod=self.request.user.faculty)
         return Course.objects.filter(department=hods_department)
 
 class SubjectCreateView(LoginRequiredMixin, HODRequiredMixin, CreateView):
     model = Subject
-    # fields = ['title', 'code', 'faculty'] # Remove this line
-    form_class = SubjectForm # Use our custom form
+    form_class = SubjectForm 
     template_name = 'core/subject_form.html'
 
     def get_form_kwargs(self):
-        # Pass the HOD's university to the form
         kwargs = super().get_form_kwargs()
         kwargs['university'] = self.request.user.faculty.university
         return kwargs
 
     def form_valid(self, form):
-        # ... this method remains the same ...
         course = Course.objects.get(pk=self.kwargs['course_pk'])
         form.instance.course = course
         return super().form_valid(form)
 
     def get_success_url(self):
-        # ... this method remains the same ...
         return reverse_lazy('core:course_detail', kwargs={'pk': self.kwargs['course_pk']})
 
 class SubjectUpdateView(LoginRequiredMixin, HODRequiredMixin, UpdateView):
     model = Subject
-    form_class = SubjectForm # Already using this, which is good
+    form_class = SubjectForm 
     template_name = 'core/subject_form.html'
 
     def get_form_kwargs(self):
-        # Pass the subject's university to the form
         kwargs = super().get_form_kwargs()
-        # The object being updated is self.object
         kwargs['university'] = self.get_object().course.university
         return kwargs
 
     def get_queryset(self):
-        # ... this method remains the same ...
         hods_department = Department.objects.get(hod=self.request.user.faculty)
         return Subject.objects.filter(course__department=hods_department)
 
     def get_success_url(self):
-        # ... this method remains the same ...
         return reverse_lazy('core:course_detail', kwargs={'pk': self.object.course.pk})
 
 class SubjectDeleteView(LoginRequiredMixin, HODRequiredMixin, DeleteView):
@@ -383,21 +471,17 @@ class EnrollStudentView(LoginRequiredMixin, HODRequiredMixin, CreateView):
     template_name = 'core/enrollment_form.html'
 
     def get_context_data(self, **kwargs):
-        # Pass the course to the template
         context = super().get_context_data(**kwargs)
         context['course'] = Course.objects.get(pk=self.kwargs['course_pk'])
         return context
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
-        # Filter the 'student' dropdown
         course_pk = self.kwargs['course_pk']
         hods_department = Department.objects.get(hod=self.request.user.faculty)
         
-        # Get primary keys of students already enrolled in this course
         enrolled_student_pks = Enrollment.objects.filter(course__pk=course_pk).values_list('student__pk', flat=True)
         
-        # Filter queryset to students in the same university, excluding those already enrolled
         form.fields['student'].queryset = Student.objects.filter(
             university=hods_department.university
         ).exclude(
@@ -406,24 +490,47 @@ class EnrollStudentView(LoginRequiredMixin, HODRequiredMixin, CreateView):
         return form
 
     def form_valid(self, form):
-        # Assign the enrollment to the correct course from the URL
         course = Course.objects.get(pk=self.kwargs['course_pk'])
         form.instance.course = course
+        enrollment = form.save() 
+
+        Notification.objects.create(
+            recipient=enrollment.student.user,
+            message=f"You have been enrolled in the course '{course.title}'."
+        )
+        messages.success(self.request, f"Successfully enrolled {enrollment.student.user.username}.")
         return super().form_valid(form)
 
     def get_success_url(self):
-        # Redirect back to the course detail page
         return reverse_lazy('core:course_detail', kwargs={'pk': self.kwargs['course_pk']})
 
+class StudentUpdateView(LoginRequiredMixin, UniversityAdminRequiredMixin, UpdateView):
+    model = Student
+    form_class = StudentUpdateForm
+    template_name = 'core/student_update_form.html'
+    success_url = reverse_lazy('core:student_list')
+
+    def get_queryset(self):
+        return Student.objects.filter(university=self.request.user.universityadmin.university)
+    
+    def form_valid(self, form):
+        messages.success(self.request, "Student profile updated successfully.")
+        return super().form_valid(form)
+
 class StudentBulkEnrollmentView(LoginRequiredMixin, HODRequiredMixin, View):
+    """
+    Handles the bulk enrollment of students into a course via a CSV file upload.
+    """
     template_name = 'core/student_bulk_enroll.html'
 
     def get(self, request, *args, **kwargs):
+        """Displays the file upload form."""
         form = FileUploadForm()
         course = get_object_or_404(Course, pk=self.kwargs['course_pk'])
         return render(request, self.template_name, {'form': form, 'course': course})
 
     def post(self, request, *args, **kwargs):
+        """Processes the uploaded CSV file."""
         form = FileUploadForm(request.POST, request.FILES)
         course = get_object_or_404(Course, pk=self.kwargs['course_pk'])
 
@@ -434,25 +541,27 @@ class StudentBulkEnrollmentView(LoginRequiredMixin, HODRequiredMixin, View):
                 messages.error(request, 'Error: This is not a CSV file.')
                 return render(request, self.template_name, {'form': form, 'course': course})
 
-            # Process the CSV file
             success_count = 0
             error_list = []
             
             try:
-                with transaction.atomic(): # Ensures all-or-nothing enrollment
+                with transaction.atomic():
                     data_set = csv_file.read().decode('UTF-8')
                     io_string = io.StringIO(data_set)
-                    next(io_string) # Skip the header row
+                    next(io_string)  
                     
-                    # Get IDs of students already enrolled to prevent duplicates
                     already_enrolled_ids = set(course.students.values_list('student_id', flat=True))
                     
-                    for row_num, column in enumerate(csv.reader(io_string), 2): # Start counting from row 2
+                    for row_num, column in enumerate(csv.reader(io_string), 2): 
                         student_id = column[0].strip()
                         roll_number = column[1].strip()
 
+                        if not student_id or not roll_number:
+                            error_list.append(f"Row {row_num}: Contains empty values.")
+                            continue
+
                         if student_id in already_enrolled_ids:
-                            continue # Skip already enrolled students silently
+                            continue  
 
                         try:
                             student = Student.objects.get(
@@ -464,19 +573,23 @@ class StudentBulkEnrollmentView(LoginRequiredMixin, HODRequiredMixin, View):
                                 course=course,
                                 roll_number=roll_number
                             )
+                            Notification.objects.create(
+                                recipient=student.user,
+                                message=f"You have been enrolled in the course '{course.title}'."
+                            )
                             success_count += 1
                         except Student.DoesNotExist:
                             error_list.append(f"Row {row_num}: Student with ID '{student_id}' not found in this university.")
                 
                 if error_list:
-                    # If any student was not found, the transaction is rolled back.
-                    raise Exception(f"The following errors occurred: {', '.join(error_list)}")
+                    raise Exception("The file contains invalid data.")
                 
-                messages.success(request, f'Successfully enrolled {success_count} new students.')
+                messages.success(request, f'Successfully enrolled {success_count} new students and sent notifications.')
                 return redirect('core:course_detail', pk=course.pk)
 
-            except Exception as e:
-                messages.error(request, f"Upload failed. No students were enrolled. Error: {e}")
+            except Exception:
+                error_summary = " ".join(error_list)
+                messages.error(request, f"Upload failed. No students were enrolled. Errors: {error_summary}")
 
         return render(request, self.template_name, {'form': form, 'course': course})
 
@@ -486,12 +599,10 @@ class UnenrollStudentView(LoginRequiredMixin, HODRequiredMixin, DeleteView):
     context_object_name = 'enrollment'
 
     def get_queryset(self):
-        # Security: Ensure HOD can only unenroll students from courses in their department
         hods_department = Department.objects.get(hod=self.request.user.faculty)
         return Enrollment.objects.filter(course__department=hods_department)
 
     def get_success_url(self):
-        # Redirect back to the course detail page after unenrolling
         messages.success(self.request, f"Student '{self.object.student.user.username}' has been unenrolled.")
         return reverse_lazy('core:course_detail', kwargs={'pk': self.object.course.pk})
 
@@ -504,10 +615,33 @@ class StudentCourseListView(LoginRequiredMixin, StudentRequiredMixin, ListView):
         """
         Return only the courses the logged-in student is enrolled in.
         """
-        # The 'student' profile is related to the User model one-to-one.
-        # The 'enrolled_courses' is the ManyToManyField on the Student model.
         student_profile = self.request.user.student
         return student_profile.enrolled_courses.all().order_by('code')
+
+class StudentSubjectDetailView(LoginRequiredMixin, StudentRequiredMixin, DetailView):
+    model = Subject
+    template_name = 'core/student_subject_detail.html'
+    context_object_name = 'subject'
+
+    def get_queryset(self):
+        """Security: A student can only view subjects of courses they are enrolled in."""
+        return Subject.objects.filter(course__students=self.request.user.student)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        student = self.request.user.student
+        subject = self.get_object()
+        
+        context['current_time'] = timezone.now()
+        context['attempted_quiz_pks'] = set(QuizAttempt.objects.filter(
+            student=student, quiz__subject=subject
+        ).values_list('quiz__pk', flat=True))
+        
+        context['attempted_assignment_pks'] = set(AssignmentSubmission.objects.filter(
+            student=student, assignment__subject=subject
+        ).values_list('assignment__pk', flat=True))
+        
+        return context
 
 class StudentCourseDetailView(LoginRequiredMixin, StudentRequiredMixin, DetailView):
     model = Course
@@ -515,18 +649,12 @@ class StudentCourseDetailView(LoginRequiredMixin, StudentRequiredMixin, DetailVi
     context_object_name = 'course'
 
     def get_queryset(self):
-        """
-        Security Check: A student can only view the details of a course
-        they are enrolled in.
-        """
         return self.request.user.student.enrolled_courses.all()
 
 class StudentProfileView(LoginRequiredMixin, StudentRequiredMixin, TemplateView):
     template_name = 'core/student_profile.html'
 
     def get_context_data(self, **kwargs):
-        # A TemplateView doesn't have self.object. 
-        # We get the student profile directly from the logged-in user.
         context = super().get_context_data(**kwargs)
         context['student_profile'] = self.request.user.student
         return context
@@ -538,7 +666,6 @@ class StudentTranscriptView(LoginRequiredMixin, StudentRequiredMixin, TemplateVi
         context = super().get_context_data(**kwargs)
         student = self.request.user.student
 
-        # Get all courses the student is enrolled in
         enrolled_courses = student.enrolled_courses.prefetch_related(
             'subjects__assignments__submissions',
             'subjects__quizzes__attempts'
@@ -551,14 +678,12 @@ class StudentTranscriptView(LoginRequiredMixin, StudentRequiredMixin, TemplateVi
                 'subjects': []
             }
             for subject in course.subjects.all():
-                # Get graded assignments for this student in this subject
                 assignments = AssignmentSubmission.objects.filter(
                     assignment__subject=subject,
                     student=student,
-                    grade__isnull=False # Only show graded assignments
+                    grade__isnull=False 
                 )
                 
-                # Get quiz attempts for this student in this subject
                 quizzes = QuizAttempt.objects.filter(
                     quiz__subject=subject,
                     student=student
@@ -583,21 +708,35 @@ class StudentAssignmentDetailView(LoginRequiredMixin, StudentRequiredMixin, Form
     template_name = 'core/student_assignment_detail.html'
     context_object_name = 'assignment'
 
+    def dispatch(self, request, *args, **kwargs):
+        assignment = self.get_object()
+        student = request.user.student
+
+        submission_exists = AssignmentSubmission.objects.filter(
+            assignment=assignment,
+            student=student
+        ).exists()
+        
+        if assignment.due_date < timezone.now() and not submission_exists:
+            messages.error(request, f"The deadline for the assignment '{assignment.title}' has passed. No more submissions are allowed.")
+            return redirect('core:student_subject_detail', pk=assignment.subject.pk)
+        return super().dispatch(request, *args, **kwargs)
+
     def get_queryset(self):
         """Security: A student can only view assignments for courses they are enrolled in."""
         return Assignment.objects.filter(subject__course__students=self.request.user.student)
 
     def get_context_data(self, **kwargs):
-        """Add the form and any existing submission to the context."""
+        """Add the form, submission status, and current time to the context."""
         context = super().get_context_data(**kwargs)
-        # Check for an existing submission
         existing_submission = AssignmentSubmission.objects.filter(
             assignment=self.object,
             student=self.request.user.student
         ).first()
         context['existing_submission'] = existing_submission
-        # Only add the form if there is no existing submission
-        if not existing_submission:
+        context['current_time'] = timezone.now()
+        
+        if not existing_submission and self.object.due_date > context['current_time']:
             context['form'] = self.get_form()
         return context
 
@@ -611,11 +750,17 @@ class StudentAssignmentDetailView(LoginRequiredMixin, StudentRequiredMixin, Form
             return self.form_invalid(form)
 
     def form_valid(self, form):
-        """Save the new submission."""
         submission = form.save(commit=False)
         submission.student = self.request.user.student
         submission.assignment = self.object
         submission.save()
+
+        for faculty_profile in self.object.subject.faculty.all():
+            Notification.objects.create(
+                recipient=faculty_profile.user,
+                message=f"'{submission.student.user.get_full_name()}' has submitted the assignment '{self.object.title}'."
+            )
+        messages.success(self.request, "Assignment submitted successfully.")
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -628,20 +773,18 @@ class TakeQuizView(LoginRequiredMixin, StudentRequiredMixin, FormView):
         quiz = self.get_quiz()
         student = request.user.student
         
-        # Check if an attempt already exists for this quiz and student
         existing_attempt = QuizAttempt.objects.filter(quiz=quiz, student=student).first()
         
         if existing_attempt:
-            # If an attempt exists, show an info message and redirect to the result page
             messages.info(request, "You have already completed this quiz. Here are your results.")
             return redirect('core:quiz_result', pk=existing_attempt.pk)
             
-        # If no attempt exists, proceed as normal
+        if quiz.due_date < timezone.now():
+            messages.error(request, f"The deadline for the quiz '{quiz.title}' has passed.")
+            return redirect('core:student_subject_detail', pk=quiz.subject.pk)
         return super().dispatch(request, *args, **kwargs)
-    # --- THIS METHOD IS RENAMED ---
     def get_form_class(self):
         quiz = self.get_quiz()
-        # Dynamically create a form class with fields for each question
         form_fields = {}
         for question in quiz.questions.all().order_by('id'):
             field_name = f'question_{question.id}'
@@ -663,8 +806,6 @@ class TakeQuizView(LoginRequiredMixin, StudentRequiredMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['quiz'] = self.get_quiz()
-        # We need to add the form instance for GET requests manually now
-        # since we are not defining it on the class
         if 'form' not in context:
             context['form'] = self.get_form()
         return context
@@ -673,7 +814,6 @@ class TakeQuizView(LoginRequiredMixin, StudentRequiredMixin, FormView):
         quiz = self.get_quiz()
         student = self.request.user.student
         
-        # Create the main quiz attempt record
         attempt = QuizAttempt.objects.create(quiz=quiz, student=student, score=0)
         
         current_score = 0
@@ -687,14 +827,19 @@ class TakeQuizView(LoginRequiredMixin, StudentRequiredMixin, FormView):
                 answer.mcq_option = selected_option
                 if selected_option.is_correct:
                     current_score += question.marks
-            else: # Descriptive
+            else: 
                 answer.descriptive_answer = value
             answer.save()
             
         attempt.score = current_score
         attempt.save()
-        
-        # Store attempt pk in session to pass to success_url
+        if quiz.questions.filter(question_type='DESCRIPTIVE').exists():
+            for faculty_profile in quiz.subject.faculty.all():
+                Notification.objects.create(
+                    recipient=faculty_profile.user,
+                    message=f"'{student.user.get_full_name()}' has completed the quiz '{quiz.title}', which has questions awaiting your review."
+                )
+
         self.request.session['quiz_attempt_pk'] = attempt.pk
         return super().form_valid(form)
 
@@ -720,19 +865,42 @@ class QuizResultView(LoginRequiredMixin, StudentRequiredMixin, DetailView):
         context['total_marks'] = total_marks
         return context
     
-class FacultySubjectListView(LoginRequiredMixin, FacultyRequiredMixin, ListView):
-    model = Subject
-    template_name = 'core/faculty_subject_list.html'
-    context_object_name = 'subjects_taught'
+class FacultyDashboardView(LoginRequiredMixin, FacultyRequiredMixin, TemplateView):
+    template_name = 'core/faculty_dashboard.html'
 
-    def get_queryset(self):
-        """
-        Return only the subjects the logged-in faculty member is assigned to teach.
-        """
-        # The 'faculty' profile is related to the User model one-to-one.
-        # The 'subjects_taught' is the ManyToManyField on the Faculty model.
-        faculty_profile = self.request.user.faculty
-        return faculty_profile.subjects_taught.all().order_by('course__code', 'code')
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        faculty = self.request.user.faculty
+        
+        subjects = Subject.objects.filter(faculty=faculty).annotate(
+            student_count=Count('course__students')
+        ).order_by('title')
+        
+        ungraded_submissions = AssignmentSubmission.objects.filter(
+            assignment__subject__faculty=faculty,
+            grade__isnull=True
+        ).order_by('-submitted_at')[:5] 
+        
+        now = timezone.now()
+        next_week = now + timedelta(days=7)
+        upcoming_assignments = Assignment.objects.filter(
+            subject__faculty=faculty,
+            due_date__gte=now,
+            due_date__lte=next_week
+        ).order_by('due_date')
+        
+        upcoming_quizzes = Quiz.objects.filter(
+            subject__faculty=faculty,
+            due_date__gte=now,
+            due_date__lte=next_week
+        ).order_by('due_date')
+        
+        context['subjects_with_stats'] = subjects
+        context['ungraded_submissions'] = ungraded_submissions
+        context['upcoming_assignments'] = upcoming_assignments
+        context['upcoming_quizzes'] = upcoming_quizzes
+        return context
+
 class FacultySubjectDetailView(LoginRequiredMixin, FacultyRequiredMixin, DetailView):
     model = Subject
     template_name = 'core/faculty_subject_detail.html'
@@ -751,21 +919,55 @@ class ResourceCreateView(LoginRequiredMixin, FacultyRequiredMixin, CreateView):
     template_name = 'core/resource_form.html'
 
     def get_context_data(self, **kwargs):
-        # Pass the subject to the template for context
         context = super().get_context_data(**kwargs)
         context['subject'] = Subject.objects.get(pk=self.kwargs['subject_pk'])
         return context
 
     def form_valid(self, form):
-        # Assign the resource to the correct subject from the URL
         subject = Subject.objects.get(pk=self.kwargs['subject_pk'])
         form.instance.subject = subject
         return super().form_valid(form)
 
     def get_success_url(self):
-        # Redirect back to the subject detail page
         return reverse_lazy('core:faculty_subject_detail', kwargs={'pk': self.kwargs['subject_pk']})
+
+# core/views.py
+
+from .models import LearningResource # Ensure this is imported
+
+# ...
+
+class ResourceUpdateView(LoginRequiredMixin, FacultyRequiredMixin, UpdateView):
+    model = LearningResource
+    fields = ['title', 'description', 'file', 'link']
+    template_name = 'core/resource_form.html' # We reuse the existing create form
+
+    def get_queryset(self):
+        # Security: Ensure faculty can only edit resources in subjects they teach
+        return LearningResource.objects.filter(subject__faculty=self.request.user.faculty)
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pass the subject to the template so the "Cancel" button works
+        context['subject'] = self.object.subject
+        return context
+    
+    def get_success_url(self):
+        messages.success(self.request, "Resource updated successfully.")
+        return reverse_lazy('core:faculty_subject_detail', kwargs={'pk': self.object.subject.pk})
+
+class ResourceDeleteView(LoginRequiredMixin, FacultyRequiredMixin, DeleteView):
+    model = LearningResource
+    template_name = 'core/resource_confirm_delete.html'
+
+    def get_queryset(self):
+        # Security: Ensure faculty can only delete resources in subjects they teach
+        return LearningResource.objects.filter(subject__faculty=self.request.user.faculty)
+
+    def get_success_url(self):
+        messages.success(self.request, "Resource deleted successfully.")
+        return reverse_lazy('core:faculty_subject_detail', kwargs={'pk': self.object.subject.pk})
+
 class AssignmentCreateView(LoginRequiredMixin, FacultyRequiredMixin, CreateView):
     model = Assignment
     form_class = AssignmentForm
@@ -777,17 +979,12 @@ class AssignmentCreateView(LoginRequiredMixin, FacultyRequiredMixin, CreateView)
         return context
 
     def form_valid(self, form):
-        # 1. Create the object in memory, but don't save to DB yet
         self.object = form.save(commit=False)
         
-        # 2. Get the subject from the URL and attach it
         subject = Subject.objects.get(pk=self.kwargs['subject_pk'])
         self.object.subject = subject
         
-        # 3. Now, save the object to the database
-        self.object.save()
-        
-        # 4. Proceed with notification logic
+        self.object.save()        
         course = self.object.subject.course
         students = course.students.all()
         for student_profile in students:
@@ -804,7 +1001,6 @@ class AssignmentCreateView(LoginRequiredMixin, FacultyRequiredMixin, CreateView)
 
 class AssignmentUpdateView(LoginRequiredMixin, FacultyRequiredMixin, UpdateView):
     model = Assignment
-    # fields = ['title', 'description', 'due_date', 'total_marks']
     form_class=AssignmentForm
     template_name = 'core/assignment_form.html'
 
@@ -839,7 +1035,6 @@ class SubmissionListView(LoginRequiredMixin, FacultyRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         submissions = self.object.submissions.all().order_by('student__user__last_name')
         
-        # Create a list of tuples, each containing a submission and its grading form
         submission_forms = []
         for sub in submissions:
             submission_forms.append((sub, GradingForm(instance=sub)))
@@ -859,9 +1054,11 @@ class GradeSubmissionView(LoginRequiredMixin, FacultyRequiredMixin, UpdateView):
         """Redirect back to the submission list page."""
         submission = self.get_object()
         return reverse_lazy('core:view_submissions', kwargs={'pk': submission.assignment.pk})
+
     def form_valid(self, form):
-        # NEW: Create notification for the student
+        messages.success(self.request, f"Grade for '{self.object.student.user.username}' has been saved.")
         submission = self.get_object()
+        grade = form.cleaned_data.get('grade')
         Notification.objects.create(
             recipient=submission.student.user,
             message=f"Your submission for '{submission.assignment.title}' has been graded. You received {form.cleaned_data.get('grade')}."
@@ -869,30 +1066,47 @@ class GradeSubmissionView(LoginRequiredMixin, FacultyRequiredMixin, UpdateView):
         messages.success(self.request, "Grade saved and student notified.")
         return super().form_valid(form)
     
+    def form_invalid(self, form):
+        """Handle an invalid form submission by creating a clean error message."""
+        error_list = []
+        for field, errors in form.errors.items():
+            for error in errors:
+                error_list.append(error)
+        clean_error_message = " ".join(error_list)
+        messages.error(self.request, f"Failed to save grade. {clean_error_message}")
+        submission = self.get_object()
+        return redirect('core:view_submissions', pk=submission.assignment.pk)
+
 class QuizCreateView(LoginRequiredMixin, FacultyRequiredMixin, CreateView):
     model = Quiz
-    # fields = ['title', 'due_date']
-    form_class=QuizForm
+    form_class = QuizForm
     template_name = 'core/quiz_form.html'
 
     def form_valid(self, form):
         subject = Subject.objects.get(pk=self.kwargs['subject_pk'])
         form.instance.subject = subject
-        return super().form_valid(form)
+        self.object = form.save()
+
+        course = self.object.subject.course
+        students = course.students.all()
+        for student_profile in students:
+            Notification.objects.create(
+                recipient=student_profile.user,
+                message=f"A new quiz '{self.object.title}' has been posted for your course '{course.title}'."
+            )
+        
+        messages.success(self.request, "Quiz created and students notified.")
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['subject'] = Subject.objects.get(pk=self.kwargs['subject_pk'])
         return context
 
-    # --- ADD THIS METHOD ---
     def get_success_url(self):
-        # Redirect to the detail page of the quiz that was just created.
-        # self.object is the new Quiz instance.
         return reverse_lazy('core:quiz_detail', kwargs={'pk': self.object.pk})
 
 class QuizDetailView(LoginRequiredMixin, FacultyRequiredMixin, DetailView):
-    # ... (This view is correct) ...
     model = Quiz
     template_name = 'core/quiz_builder.html'
     context_object_name = 'quiz'
@@ -903,16 +1117,13 @@ class QuizDetailView(LoginRequiredMixin, FacultyRequiredMixin, DetailView):
 
 class QuizUpdateView(LoginRequiredMixin, FacultyRequiredMixin, UpdateView):
     model = Quiz
-    # fields = ['title', 'due_date']
     form_class=QuizForm
     template_name = 'core/quiz_form.html'
 
     def get_queryset(self):
         return Quiz.objects.filter(subject__faculty=self.request.user.faculty)
 
-    # --- ADD THIS METHOD ---
     def get_success_url(self):
-        # Redirect to the detail page of the quiz that was just updated.
         return reverse_lazy('core:quiz_detail', kwargs={'pk': self.object.pk})
 
 class QuizDeleteView(LoginRequiredMixin, FacultyRequiredMixin, DeleteView):
@@ -940,12 +1151,12 @@ class QuestionCreateView(LoginRequiredMixin, FacultyRequiredMixin, CreateView):
         return context
 
     def form_valid(self, form):
-        # Assign question to the correct quiz
+        
         quiz = Quiz.objects.get(pk=self.kwargs['quiz_pk'])
         form.instance.quiz = quiz
-        self.object = form.save() # Save the question to get an ID
+        self.object = form.save() 
 
-        # Process the formset for options
+        
         option_formset = MCQOptionFormSet(self.request.POST, instance=self.object)
         if option_formset.is_valid():
             option_formset.save()
@@ -954,6 +1165,85 @@ class QuestionCreateView(LoginRequiredMixin, FacultyRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse_lazy('core:quiz_detail', kwargs={'pk': self.kwargs['quiz_pk']})
+
+class QuizQuestionBulkUploadView(LoginRequiredMixin, FacultyRequiredMixin, View):
+    template_name = 'core/quiz_bulk_upload.html'
+
+    def get(self, request, pk):
+        quiz = get_object_or_404(Quiz, pk=pk, subject__faculty=request.user.faculty)
+        form = FileUploadForm()
+        return render(request, self.template_name, {'form': form, 'quiz': quiz})
+
+    def post(self, request, pk):
+        quiz = get_object_or_404(Quiz, pk=pk, subject__faculty=request.user.faculty)
+        form = FileUploadForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            csv_file = request.FILES['file']
+            
+            if not csv_file.name.endswith('.csv'):
+                messages.error(request, 'Error: This is not a CSV file.')
+                return render(request, self.template_name, {'form': form, 'quiz': quiz})
+
+            try:
+                with transaction.atomic():
+                    data_set = csv_file.read().decode('UTF-8')
+                    io_string = io.StringIO(data_set)
+                    next(io_string) # Skip header
+                    
+                    questions_created = 0
+                    
+                    # Expected CSV Format:
+                    # Type, Question Text, Marks, Option1, Option2, Option3, Option4, Correct Option Index (1-4)
+                    
+                    for row_num, column in enumerate(csv.reader(io_string), 2):
+                        # Basic cleanup
+                        q_type = column[0].strip().upper() # MCQ or DESCRIPTIVE
+                        q_text = column[1].strip()
+                        q_marks = int(column[2].strip())
+                        
+                        if not q_text:
+                            continue # Skip empty rows
+
+                        # Create Question
+                        question = Question.objects.create(
+                            quiz=quiz,
+                            text=q_text,
+                            question_type=q_type,
+                            marks=q_marks
+                        )
+
+                        # Handle Options for MCQ
+                        if q_type == 'MCQ':
+                            # Get options from columns 3, 4, 5, 6
+                            options_text = [column[3].strip(), column[4].strip(), column[5].strip(), column[6].strip()]
+                            
+                            # Column 7 contains the index of the correct answer (1, 2, 3, or 4)
+                            try:
+                                correct_index = int(column[7].strip())
+                            except ValueError:
+                                raise Exception(f"Row {row_num}: Correct option index must be a number (1-4).")
+
+                            if correct_index < 1 or correct_index > 4:
+                                raise Exception(f"Row {row_num}: Correct option index must be between 1 and 4.")
+
+                            for i, text in enumerate(options_text):
+                                if text: # Only create option if text exists
+                                    MCQOption.objects.create(
+                                        question=question,
+                                        text=text,
+                                        is_correct=(i + 1 == correct_index)
+                                    )
+                        
+                        questions_created += 1
+
+                messages.success(request, f'Successfully uploaded {questions_created} questions.')
+                return redirect('core:quiz_detail', pk=quiz.pk)
+
+            except Exception as e:
+                messages.error(request, f"Upload failed: {e}")
+
+        return render(request, self.template_name, {'form': form, 'quiz': quiz})
 
 class QuizAttemptsListView(LoginRequiredMixin, FacultyRequiredMixin, DetailView):
     model = Quiz
@@ -964,7 +1254,7 @@ class QuizAttemptsListView(LoginRequiredMixin, FacultyRequiredMixin, DetailView)
         """Security: Faculty can only view attempts for quizzes in their subjects."""
         return Quiz.objects.filter(subject__faculty=self.request.user.faculty)
 
-# core/views.py
+
 
 class GradeQuizAttemptView(LoginRequiredMixin, FacultyRequiredMixin, View):
     
@@ -974,8 +1264,8 @@ class GradeQuizAttemptView(LoginRequiredMixin, FacultyRequiredMixin, View):
         descriptive_answers_qs = attempt.answers.filter(question__question_type='DESCRIPTIVE')
         formset = DescriptiveAnswerFormSet(queryset=descriptive_answers_qs)
 
-        # --- NEW LOGIC HERE ---
-        # Pair up questions with their answers for easier rendering in the template
+        
+        
         questions_and_answers = []
         for question in attempt.quiz.questions.all().order_by('id'):
             student_answer = attempt.answers.filter(question=question).first()
@@ -992,7 +1282,7 @@ class GradeQuizAttemptView(LoginRequiredMixin, FacultyRequiredMixin, View):
         return render(request, 'core/grade_quiz_attempt.html', context)
 
     def post(self, request, pk):
-        # ... The 'post' method from the previous step remains the same ...
+        
         attempt = get_object_or_404(QuizAttempt, pk=pk, quiz__subject__faculty=request.user.faculty)
         DescriptiveAnswerFormSet = modelformset_factory(StudentAnswer, fields=('marks_awarded',), extra=0)
         descriptive_answers_qs = attempt.answers.filter(question__question_type='DESCRIPTIVE')
@@ -1005,7 +1295,7 @@ class GradeQuizAttemptView(LoginRequiredMixin, FacultyRequiredMixin, View):
                 total=models.Sum('question__marks')
             )['total'] or 0
             
-            # Use the saved formset instances to calculate the sum
+            
             descriptive_score = 0
             for form in formset.cleaned_data:
                  if form.get('marks_awarded'):
@@ -1013,10 +1303,15 @@ class GradeQuizAttemptView(LoginRequiredMixin, FacultyRequiredMixin, View):
 
             attempt.score = total_score + descriptive_score
             attempt.save()
+            Notification.objects.create(
+                recipient=attempt.student.user,
+                message=f"Your quiz '{attempt.quiz.title}' has been fully graded. Your final score is {attempt.score}."
+            )
             messages.success(request, f"Successfully graded quiz for {attempt.student.user.get_full_name()}.")
+            
             return redirect('core:quiz_attempts_list', pk=attempt.quiz.pk)
         
-        # We need to rebuild the context if the form is invalid
+        
         questions_and_answers = []
         for question in attempt.quiz.questions.all().order_by('id'):
             student_answer = attempt.answers.filter(question=question).first()
@@ -1037,8 +1332,8 @@ class NotificationListView(LoginRequiredMixin, ListView):
     context_object_name = 'notifications'
 
     def get_queryset(self):
-        # Get notifications for the current user
+        
         queryset = super().get_queryset().filter(recipient=self.request.user)
-        # Mark them as read
+        
         queryset.filter(is_read=False).update(is_read=True)
         return queryset

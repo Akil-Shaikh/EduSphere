@@ -1,0 +1,97 @@
+{% extends 'core/base.html' %}
+{% block title %}Faculty Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Faculty Dashboard</h1>
+</div>
+
+<div class="row">
+    {% for subject in subjects_with_stats %}
+    <div class="col-xl-3 col-md-6 mb-4">
+        <a href="{% url 'core:faculty_subject_detail' subject.pk %}" style="text-decoration: none;">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">{{ subject.title }}
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ subject.student_count }} Students
+                            </div>
+                        </div>
+                        <div class="col-auto"><i class="fas fa-chalkboard-teacher fa-2x text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Needs Grading</h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for submission in ungraded_submissions %}
+                    <a href="{% url 'core:view_submissions' submission.assignment.pk %}"
+                        class="list-group-item list-group-item-action">
+                        {{ submission.student.user.get_full_name }} submitted '{{ submission.assignment.title }}'
+                        <br><small class="text-muted">{{ submission.submitted_at|timesince }} ago</small>
+                    </a>
+                    {% empty %}
+                    <div class="list-group-item">No ungraded submissions. Great job!</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Upcoming Deadlines (Next 7 Days)</h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+
+                    {% for assignment in upcoming_assignments %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <div>
+                                <i class="fas fa-file-alt text-warning mr-2"></i>
+                                <strong>{{ assignment.title }}</strong>
+                                <div class="small text-gray-600 ml-4">Subject: {{ assignment.subject.title }}</div>
+                            </div>
+                            <span class="text-muted small text-nowrap">Due: {{ assignment.due_date|date:"M d" }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% for quiz in upcoming_quizzes %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <div>
+                                <i class="fas fa-question-circle text-info mr-2"></i>
+                                <strong>{{ quiz.title }}</strong>
+                                <div class="small text-gray-600 ml-4">Subject: {{ quiz.subject.title }}</div>
+                            </div>
+                            <span class="text-muted small text-nowrap">Due: {{ quiz.due_date|date:"M d" }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% if not upcoming_assignments and not upcoming_quizzes %}
+                    <div class="list-group-item text-center text-muted">
+                        No deadlines in the next week.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

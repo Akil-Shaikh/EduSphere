@@ -2,12 +2,8 @@
 
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.validators import MinValueValidator, MaxValueValidator
 from django.forms import ValidationError
 
-# -----------------------------------------------------------------------------
-# SECTION 1: CORE ORGANIZATIONAL & USER PROFILE MODELS
-# -----------------------------------------------------------------------------
 
 class University(models.Model):
     """Represents a single university in the system."""
@@ -20,7 +16,6 @@ class UniversityAdmin(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     university = models.OneToOneField(University, on_delete=models.CASCADE)
 
-    # --- ADD THIS METHOD ---
     def save(self, *args, **kwargs):
         if hasattr(self.user, 'student') or hasattr(self.user, 'faculty'):
             raise ValidationError("This user is already assigned to another role (Student or Faculty).")
@@ -33,11 +28,9 @@ class Department(models.Model):
     """Represents an academic department within a university."""
     name = models.CharField(max_length=200)
     university = models.ForeignKey(University, on_delete=models.CASCADE, related_name='departments')
-    # An HOD is a faculty member. Can be null if no HOD is assigned yet.
     hod = models.OneToOneField('Faculty', on_delete=models.SET_NULL, null=True, blank=True, related_name='led_department')
-
     class Meta:
-        unique_together = ('name', 'university') # Department names must be unique within a university
+        unique_together = ('name', 'university')
 
     def __str__(self):
         return f"{self.name} ({self.university.name})"
@@ -51,7 +44,6 @@ class Faculty(models.Model):
     class Meta:
         unique_together = ('university', 'employee_id')
 
-    # --- ADD THIS METHOD ---
     def save(self, *args, **kwargs):
         if hasattr(self.user, 'student') or hasattr(self.user, 'universityadmin'):
             raise ValidationError("This user is already assigned to another role (Student or Admin).")
@@ -68,7 +60,6 @@ class Student(models.Model):
     class Meta:
         unique_together = ('university', 'student_id')
 
-    # --- ADD THIS METHOD ---
     def save(self, *args, **kwargs):
         # Check if the user already has a different profile
         if hasattr(self.user, 'faculty') or hasattr(self.user, 'universityadmin'):
@@ -77,31 +68,21 @@ class Student(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.username} ({self.student_id})"
-# -----------------------------------------------------------------------------
-# SECTION 2: ACADEMIC STRUCTURE MODELS
-# -----------------------------------------------------------------------------
+    
 
 class Course(models.Model):
     """Represents a program of study, e.g., MScIT 1st Year Sem 2."""
     title = models.CharField(max_length=200)
-    # REMOVED: unique=True from here
     code = models.CharField(max_length=20)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='courses')
-    # ADDED: Direct link to University to enforce uniqueness
     university = models.ForeignKey(University, on_delete=models.CASCADE)
 
-    # ADDED: Meta class for combined uniqueness
     class Meta:
         unique_together = ('university', 'code')
 
     def __str__(self):
         return f"{self.title} ({self.code})"
 
-    # Versioning can be handled by creating a new Course instance for a new syllabus
-    # or by adding a version field, e.g., version = models.PositiveIntegerField(default=1)
-
-    def __str__(self):
-        return f"{self.title} ({self.code})"
 
 class Enrollment(models.Model):
     """Intermediate model to manage student enrollment in courses."""
@@ -111,7 +92,7 @@ class Enrollment(models.Model):
     roll_number = models.CharField(max_length=30)
 
     class Meta:
-        unique_together = ('student', 'course') # A student can enroll in a course only once
+        unique_together = ('student', 'course')
 
     def __str__(self):
         return f"{self.student} enrolled in {self.course}"
@@ -121,18 +102,14 @@ class Subject(models.Model):
     title = models.CharField(max_length=200)
     code = models.CharField(max_length=20)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='subjects')
-    # ManyToManyField allows for co-teaching/collaboration
+    
     faculty = models.ManyToManyField(Faculty, related_name='subjects_taught')
 
     class Meta:
-        unique_together = ('code', 'course') # Subject code unique within a course
+        unique_together = ('code', 'course')
 
     def __str__(self):
         return f"{self.title} ({self.code})"
-
-# -----------------------------------------------------------------------------
-# SECTION 3: LEARNING & ASSESSMENT MODELS
-# -----------------------------------------------------------------------------
 
 class LearningResource(models.Model):
     """Represents learning material like PDFs, notes, or video links."""
@@ -140,8 +117,8 @@ class LearningResource(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     upload_date = models.DateTimeField(auto_now_add=True)
-    file = models.FileField(upload_to='resources/%Y/%m/%d/', blank=True, null=True) # For PDFs, notes
-    link = models.URLField(blank=True, null=True) # For video links
+    file = models.FileField(upload_to='resources/%Y/%m/%d/', blank=True, null=True)
+    link = models.URLField(blank=True, null=True)
 
     def __str__(self):
         return self.title
@@ -165,7 +142,7 @@ class AssignmentSubmission(models.Model):
     submitted_at = models.DateTimeField(auto_now_add=True)
     grade = models.PositiveIntegerField(null=True, blank=True)
     feedback = models.TextField(blank=True)
-
+    
     class Meta:
         unique_together = ('assignment', 'student')
 
@@ -226,46 +203,12 @@ class StudentAnswer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     mcq_option = models.ForeignKey(MCQOption, on_delete=models.CASCADE, null=True, blank=True)
     descriptive_answer = models.TextField(blank=True, null=True)
-    marks_awarded = models.PositiveIntegerField(null=True, blank=True) # New Field
+    marks_awarded = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"Answer to Q: {self.question.text[:30]}..."
 
-# -----------------------------------------------------------------------------
-# SECTION 4: TRANSCRIPT & PROGRESS MODELS
-# -----------------------------------------------------------------------------
 
-class StudentGrade(models.Model):
-    """Stores the final grade for a student in a particular subject."""
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='grades')
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='grades')
-    # Storing both letter grade and points makes GPA calculation easier
-    grade = models.CharField(max_length=2) # e.g., 'A+', 'B', 'C-'
-    points = models.DecimalField(max_digits=3, decimal_places=2) # e.g., 4.00, 3.33
-
-    class Meta:
-        unique_together = ('student', 'subject')
-    
-    def __str__(self):
-        return f"{self.student}: {self.subject.code} - {self.grade}"
-
-class Attendance(models.Model):
-    """Tracks student attendance for a subject on a given date."""
-    STATUS_CHOICES = [
-        ('Present', 'Present'),
-        ('Absent', 'Absent'),
-    ]
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendance_records')
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='attendance_records')
-    date = models.DateField()
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
-    
-    class Meta:
-        unique_together = ('student', 'subject', 'date')
-
-    def __str__(self):
-        return f"{self.student} - {self.subject.code} on {self.date}: {self.status}"
-    
 class Notification(models.Model):
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     message = models.TextField()
